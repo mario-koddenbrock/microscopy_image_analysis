@@ -1,18 +1,17 @@
 import os
-import torch
-import torchvision
 import warnings
-from torchvision import datasets, transforms, models
-from torch.utils.data import DataLoader, random_split
-from torch import nn, optim
-import numpy as np
-import matplotlib.pyplot as plt
-from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, classification_report
-import rasterio
-from rasterio.errors import RasterioIOError
-from PIL import Image
-from tqdm import tqdm  # For progress bars
 
+import matplotlib.pyplot as plt
+import numpy as np
+import rasterio
+import torch
+from PIL import Image
+from rasterio.errors import RasterioIOError
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, classification_report
+from torch import nn, optim
+from torch.utils.data import DataLoader, random_split
+from torchvision import datasets, transforms, models
+from tqdm import tqdm
 
 # Ignore specific warnings
 ignored_warnings = [
@@ -212,7 +211,7 @@ class ImageClassifierTrainer:
         self.model_path = os.path.join(models_dir, f'best_model_{self.model_name}.pt')
 
         for epoch in range(self.num_epochs):
-            print(f'\nEpoch {epoch+1}/{self.num_epochs}')
+            print(f'Epoch {epoch+1}/{self.num_epochs}')
             train_loss = 0.0
             val_loss = 0.0
             correct_train = 0
@@ -296,8 +295,8 @@ class ImageClassifierTrainer:
 
             # Save the model if validation loss has decreased
             if val_loss < best_val_loss:
-                print('Validation loss decreased ({:.4f} --> {:.4f}).  Saving model ...'.format(
-                    best_val_loss, val_loss))
+                # print('Validation loss decreased ({:.4f} --> {:.4f}).  Saving model ...'.format(
+                #     best_val_loss, val_loss))
                 best_val_loss = val_loss
                 torch.save(self.model.state_dict(), self.model_path)
 
