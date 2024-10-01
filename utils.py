@@ -1,12 +1,6 @@
 import os.path
 import time
 
-import cv2
-import numpy as np
-import rasterio
-from PIL import Image
-from rasterio.errors import RasterioIOError
-
 import plotting
 import prompts
 from vlm.clip import CLIPEvaluator
@@ -56,7 +50,7 @@ def evaluate_image(evaluators, image_path):
 
 
 
-def evaluate_dataset(evaluators, dataset_name, dataset_description):
+def evaluate_dataset(evaluators, dataset_name, dataset_description, dataset_path, num_images_per_class, num_classes):
     """
     Evaluate a dataset using the provided evaluators.
 
@@ -64,39 +58,42 @@ def evaluate_dataset(evaluators, dataset_name, dataset_description):
         evaluators (dict): Dictionary of initialized evaluators.
         dataset_name (str): Name of the dataset to evaluate.
         dataset_description (str): Description of the dataset.
+        dataset_path (str): Path to the dataset to evaluate.
+        num_images (int): How many images should be evaluated.
     """
-    classes = get_dataset_classes(dataset_name)
+    classes = get_dataset_classes(dataset_path)
     if not classes:
-        print(f"No classes found for dataset {dataset_name}")
+        print(f"No classes found for dataset: {dataset_path}")
         return
 
     print(f"Dataset: {dataset_name}")
     sample_prompt = prompts.classification_prompt(dataset_name=dataset_name, dataset_description=dataset_description)
 
-    for class_name in classes:
-        print(f"Class: {class_name}")
+    result_images = []
+    for class_idx, class_name in enumerate(classes[:num_classes]):
+        print(f"\tClass {class_idx}: {class_name}")
         results = {name: "default_result" for name in evaluators.keys()}
-        class_files = get_class_files(dataset_name, class_name)
-        sample_image_url = class_files[0]
+        class_files = get_class_files(dataset_path, class_name)
 
-        print(f"Sample image: {sample_image_url}")
+        for sample_image_url in class_files[:num_images_per_class]:
+            print(f"\tSample image: {sample_image_url}")
 
-        for name, evaluator in evaluators.items():
+            for name, evaluator in evaluators.items():
 
-            if isinstance(evaluator, CLIPEvaluator) or isinstance(evaluator, VisualBertEvaluator):
-                evaluator.set_class_names(classes)
+                if isinstance(evaluator, CLIPEvaluator) or isinstance(evaluator, VisualBertEvaluator):
+                    evaluator.set_class_names(classes)
 
-            start_time = time.time()
-            results[name] = evaluator.evaluate(prompt=sample_prompt, image_path=sample_image_url)
-            end_time = time.time()
-            print(f"{name} Output: {results[name]} (Evaluated in {end_time - start_time:.2f} seconds)")
+                start_time = time.time()
+                results[name] = evaluator.evaluate(prompt=sample_prompt, image_path=sample_image_url)
+                end_time = time.time()
+                print(f"\t\t{name} Output: {results[name]} (Evaluated in {end_time - start_time:.2f} seconds)")
 
-        plotting.show_prediction_result(sample_image_url, dataset_name, class_name, results)
+            result_image_path = plotting.show_prediction_result(sample_image_url, dataset_name, class_name, results)
+            result_images.append(result_image_path)
 
+    return result_images
 
-def get_class_files(dataset_name, class_name):
-
-    dataset_path = os.path.join("datasets", dataset_name)
+def get_class_files(dataset_path, class_name):
 
     classes = os.listdir(dataset_path)
 
@@ -112,7 +109,7 @@ def get_class_files(dataset_name, class_name):
     class_path = os.path.join(dataset_path, class_name)
 
     if not os.path.exists(class_path):
-        raise ValueError(f"Class {class_name} not found in {dataset_name} dataset.")
+        raise ValueError(f"Class {class_name} not found in dataset {dataset_path}")
 
     class_subfolders = os.listdir(class_path)
 
@@ -126,53 +123,18 @@ def get_class_files(dataset_name, class_name):
     return files
 
 
-def get_dataset_classes(name):
-    if name == "MVTec_AD":
-        # get the folder names inside the MVTec_AD dataset
-        # folder = os.listdir("datasets/MVTec_AD") # TODO: Implement this
-        return None
+def get_dataset_classes(dataset_path):
 
-    elif name == "BloodMNIST":
-        # get the folder names inside the BloodMNIST dataset
-        # folder = os.listdir("datasets/BloodMNIST") # TODO: Implement this
-        return None
-
-    elif name == "TissueMNIST":
-        # get the folder names inside the TissueMNIST dataset
-        # folder = os.listdir("datasets/TissueMNIST") # TODO: Implement this
-        return None
-
-    elif name == "BreakHis":
-        # get the folder names inside the
-        # folder = os.listdir("datasets/BreakHis") # TODO: Implement this
-        return None
-
-    elif name == "PlantVillage":
-        # get the folder names inside the PlantVillage dataset
-        folder = os.listdir("datasets/PlantVillage")
-
-    elif name == "FER2013":
-        # get the folder names inside the FER2013 dataset
-        folder = os.listdir("datasets/FER2013")
-
-    elif name == "EuroSAT":
-        # get the folder names inside the EuroSAT dataset
-        folder = os.listdir("datasets/EuroSAT")
-
-    elif name == "Food-101":
-        # get the folder names inside the Food-101 dataset
-        folder = os.listdir("datasets/Food-101")
-
-    else:
-        raise ValueError(f"Unknown dataset: {name}")
+    # get the folder names inside the dataset
+    folder = os.listdir(dataset_path)
 
     # if folder contains test and train folders, only use test
     if "test" in folder:
-        folder = os.listdir(f"datasets/{name}/test")
+        folder = os.listdir(os.path.join(dataset_path, "test"))
 
     # if folder contains images, only use images
     if "images" in folder:
-        folder = os.listdir(f"datasets/{name}/images")
+        folder = os.listdir(os.path.join(dataset_path, "images"))
 
     # filter out the folders that are not classes or are not visible
     classes = [f for f in folder if not f.startswith(".")]
