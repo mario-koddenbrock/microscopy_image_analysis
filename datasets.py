@@ -61,7 +61,6 @@ object_detection_datasets = [
 ]
 
 
-
 class DatasetDownloader:
     def __init__(self, datasets, download_dir=None):
         """
@@ -242,7 +241,6 @@ class DatasetDownloader:
 
 # Usage example:
 if __name__ == '__main__':
-
     # Classification datasets
     downloader = DatasetDownloader(classification_datasets, download_dir=os.path.join('datasets', 'Classification'))
     downloader.download_and_extract()
@@ -254,7 +252,3 @@ if __name__ == '__main__':
     # Object detection datasets
     downloader = DatasetDownloader(object_detection_datasets, download_dir=os.path.join('datasets', 'ObjectDetection'))
     downloader.download_and_extract()
-
-
-
-
