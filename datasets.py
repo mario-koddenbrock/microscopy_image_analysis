@@ -1,8 +1,65 @@
 import os
-import requests
-from urllib.parse import urlparse
-import zipfile
 import tarfile
+import zipfile
+from urllib.parse import urlparse
+
+import rasterio
+import requests
+from rasterio.errors import RasterioIOError
+import urllib3
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+# Dictionary of datasets to be placed in 'datasets/Classification'
+classification_datasets = {
+    'Acinetobacter baumanii': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Acinetobacter.baumanii.zip',
+    'Actinomyces israelii': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Actinomyces.israeli.zip',
+    'Bacteroides fragilis': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Bacteroides.fragilis.zip',
+    'Bifidobacterium spp.': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Bifidobacterium.spp.zip',
+    'Candida albicans': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Candida.albicans.zip',
+    'Clostridium perfringens': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Clostridium.perfringens.zip',
+    'Enterococcus faecium': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Enterococcus.faecium.zip',
+    'Enterococcus faecalis': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Enterococcus.faecalis.zip',
+    'Escherichia coli': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Escherichia.coli.zip',
+    'Fusobacterium spp.': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Fusobacterium.zip',
+    'Lactobacillus casei': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Lactobacillus.casei.zip',
+    'Lactobacillus crispatus': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Lactobacillus.crispatus.zip',
+    'Lactobacillus delbrueckii': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Lactobacillus.delbrueckii.zip',
+    'Lactobacillus gasseri': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Lactobacillus.gasseri.zip',
+    'Lactobacillus jehnsenii': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Lactobacillus.jehnsenii.zip',
+    'Lactobacillus johnsonii': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Lactobacillus.johnsonii.zip',
+    'Lactobacillus paracasei': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Lactobacillus.paracasei.zip',
+    'Lactobacillus plantaru': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Lactobacillus.plantarum.zip',
+    'Lactobacillus reuteri': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Lactobacillus.reuteri.zip',
+    'Lactobacillus rhamnosus': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Lactobacillus.rhamnosus.zip',
+    'Lactobacillus salivarius': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Lactobacillus.salivarius.zip',
+    'Listeria monocytogenes': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Listeria.monocytogenes.zip',
+    'Micrococcus spp.': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Micrococcus.spp.zip',
+    'Neisseria gonorrhoeae': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Neisseria.gonorrhoeae.zip',
+    'Porphyromonas gingivalis': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Porfyromonas.gingivalis.zip',
+    'Propionibacterium acnes': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Propionibacterium.acnes.zip',
+    'Proteus spp.': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Proteus.zip',
+    'Pseudomonas aeruginosa': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Pseudomonas.aeruginosa.zip',
+    'Staphylococcus aureus': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Staphylococcus.aureus.zip',
+    'Staphylococcus epidermidis': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Staphylococcus.epidermidis.zip',
+    'Staphylococcus saprophiticus': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Staphylococcus.saprophiticus.zip',
+    'Streptococcus agalactiae': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Streptococcus.agalactiae.zip',
+    'Veionella spp.': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Veionella.zip'
+}
+
+segmentation_datasets = [
+    'https://zenodo.org/records/5550933#.YYMBMxwxlqg',
+    'https://zenodo.org/records/5550935#.YYMBAxwxlqg',
+    'https://zenodo.org/records/5550968#.YYMBgRwxlqg',
+    'https://zenodo.org/records/5639253#.YYMAeBwxlqg',
+    'https://zenodo.org/records/5551009#.YYMBthwxlqg',
+]
+
+object_detection_datasets = [
+    'https://zenodo.org/records/5551016#.YYMCjhwxlqg',
+    'https://zenodo.org/records/5551057#.YYMCtRwxlqg',
+]
+
 
 
 class DatasetDownloader:
@@ -35,6 +92,9 @@ class DatasetDownloader:
                 self._download_and_extract_zenodo(url)
         else:
             print("Datasets should be either a list of URLs or a dictionary of name: url pairs.")
+
+        # After extraction, check and clean images
+        self.check_and_clean_images()
 
     def _download_and_extract_direct(self, name, url):
         # Download the file
@@ -155,76 +215,44 @@ class DatasetDownloader:
         else:
             print(f"File {file_name} is not an archive or unsupported format, skipping extraction.")
 
+    def check_and_clean_images(self):
+        """
+        Traverses the extracted dataset directories, attempts to open each image,
+        and deletes any image files that are corrupt.
+        """
+        print("Checking for corrupt images...")
+        num_deleted = 0
+        for root, dirs, files in os.walk(self.download_dir):
+            for file in files:
+                file_path = os.path.join(root, file)
+                # Only check image files
+                if file.lower().endswith(('.tif', '.tiff', '.jpg', '.jpeg', '.png')):
+                    try:
+                        with rasterio.open(file_path) as src:
+                            src.read()
+                    except (RasterioIOError, ValueError) as e:
+                        print(f"Corrupt image found and deleted: {file_path}")
+                        os.remove(file_path)
+                        num_deleted += 1
+        if num_deleted == 0:
+            print("No corrupt images found.")
+        else:
+            print(f"Deleted {num_deleted} corrupt image(s).")
+
 
 # Usage example:
 if __name__ == '__main__':
 
-    # Dictionary of datasets to be placed in 'datasets/Classification'
-    datasets = {
-        'Acinetobacter baumanii': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Acinetobacter.baumanii.zip',
-        'Actinomyces israelii': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Actinomyces.israeli.zip',
-        'Bacteroides fragilis': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Bacteroides.fragilis.zip',
-        'Bifidobacterium spp.': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Bifidobacterium.spp.zip',
-        'Candida albicans': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Candida.albicans.zip',
-        'Clostridium perfringens': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Clostridium.perfringens.zip',
-        'Enterococcus faecium': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Enterococcus.faecium.zip',
-        'Enterococcus faecalis': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Enterococcus.faecalis.zip',
-        'Escherichia coli': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Escherichia.coli.zip',
-        'Fusobacterium spp.': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Fusobacterium.zip',
-        'Lactobacillus casei': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Lactobacillus.casei.zip',
-        'Lactobacillus crispatus': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Lactobacillus.crispatus.zip',
-        'Lactobacillus delbrueckii': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Lactobacillus.delbrueckii.zip',
-        'Lactobacillus gasseri': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Lactobacillus.gasseri.zip',
-        'Lactobacillus jehnsenii': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Lactobacillus.jehnsenii.zip',
-        'Lactobacillus johnsonii': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Lactobacillus.johnsonii.zip',
-        'Lactobacillus paracasei': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Lactobacillus.paracasei.zip',
-        'Lactobacillus plantaru': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Lactobacillus.plantarum.zip',
-        'Lactobacillus reuteri': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Lactobacillus.reuteri.zip',
-        'Lactobacillus rhamnosus': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Lactobacillus.rhamnosus.zip',
-        'Lactobacillus salivarius': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Lactobacillus.salivarius.zip',
-        'Listeria monocytogenes': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Listeria.monocytogenes.zip',
-        'Micrococcus spp.': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Micrococcus.spp.zip',
-        'Neisseria gonorrhoeae': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Neisseria.gonorrhoeae.zip',
-        'Porphyromonas gingivalis': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Porfyromonas.gingivalis.zip',
-        'Propionibacterium acnes': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Propionibacterium.acnes.zip',
-        'Proteus spp.': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Proteus.zip',
-        'Pseudomonas aeruginosa': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Pseudomonas.aeruginosa.zip',
-        'Staphylococcus aureus': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Staphylococcus.aureus.zip',
-        'Staphylococcus epidermidis': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Staphylococcus.epidermidis.zip',
-        'Staphylococcus saprophiticus': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Staphylococcus.saprophiticus.zip',
-        'Streptococcus agalactiae': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Streptococcus.agalactiae.zip',
-        'Veionella spp.': 'https://doctoral.matinf.uj.edu.pl/database/dibas/Veionella.zip'
-    }
-
-    download_dir = os.path.join('datasets', 'Classification')
-    downloader = DatasetDownloader(datasets, download_dir=download_dir)
+    # Classification datasets
+    downloader = DatasetDownloader(classification_datasets, download_dir=os.path.join('datasets', 'Classification'))
     downloader.download_and_extract()
 
-    urls_segmentation = [
-        'https://zenodo.org/records/5550933#.YYMBMxwxlqg',
-        'https://zenodo.org/records/5550935#.YYMBAxwxlqg',
-        'https://zenodo.org/records/5550968#.YYMBgRwxlqg',
-        'https://zenodo.org/records/5639253#.YYMAeBwxlqg',
-        'https://zenodo.org/records/5551009#.YYMBthwxlqg',
-    ]
-
-    # specify a directory
-    directory_segmentation = 'datasets/Segmentation'
-
-    # Create an instance with a custom download directory
-    downloader = DatasetDownloader(urls_segmentation, download_dir=directory_segmentation)
+    # Segmentation datasets
+    downloader = DatasetDownloader(segmentation_datasets, download_dir=os.path.join('datasets', 'Segmentation'))
     downloader.download_and_extract()
 
-    urls_object_detection = [
-        'https://zenodo.org/records/5551016#.YYMCjhwxlqg',
-        'https://zenodo.org/records/5551057#.YYMCtRwxlqg',
-    ]
-
-    # specify a directory
-    directory_object_detection = 'datasets/ObjectDetection'
-
-    # Create an instance with a custom download directory
-    downloader = DatasetDownloader(urls_object_detection, download_dir=directory_object_detection)
+    # Object detection datasets
+    downloader = DatasetDownloader(object_detection_datasets, download_dir=os.path.join('datasets', 'ObjectDetection'))
     downloader.download_and_extract()
 
 
