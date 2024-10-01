@@ -7,15 +7,23 @@ from torch.utils.data import DataLoader, random_split
 from torch import nn, optim
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, classification_report
 import rasterio
 from rasterio.errors import RasterioIOError
 from PIL import Image
 from tqdm import tqdm  # For progress bars
 
 
-# ignore NotGeoreferencedWarning warnings
-warnings.filterwarnings("ignore", category=rasterio.errors.NotGeoreferencedWarning)
+# Ignore specific warnings
+ignored_warnings = [
+    rasterio.errors.NotGeoreferencedWarning,
+    DeprecationWarning,
+    FutureWarning,
+    UserWarning
+]
+
+for warning in ignored_warnings:
+    warnings.filterwarnings("ignore", category=warning)
 
 
 class ImageClassifierTrainer:
@@ -201,7 +209,7 @@ class ImageClassifierTrainer:
         # Ensure the models directory exists
         models_dir = os.path.join('models', 'Classification')
         os.makedirs(models_dir, exist_ok=True)
-        self.best_model_path = os.path.join(models_dir, f'best_model_{self.model_name}.pt')
+        self.model_path = os.path.join(models_dir, f'best_model_{self.model_name}.pt')
 
         for epoch in range(self.num_epochs):
             print(f'\nEpoch {epoch+1}/{self.num_epochs}')
@@ -291,14 +299,15 @@ class ImageClassifierTrainer:
                 print('Validation loss decreased ({:.4f} --> {:.4f}).  Saving model ...'.format(
                     best_val_loss, val_loss))
                 best_val_loss = val_loss
-                torch.save(self.model.state_dict(), self.best_model_path)
+                torch.save(self.model.state_dict(), self.model_path)
 
         # Optionally, plot the training and validation loss and accuracy curves
         self._plot_training_curves()
 
+
     def evaluate(self):
-        # Load the best model
-        self.load_model(self.best_model_path)
+        # # Load the best model
+        # self.load_model(self.model_path)
 
         # Evaluation on the test set
         self.model.eval()
@@ -329,6 +338,9 @@ class ImageClassifierTrainer:
         disp.plot(ax=ax, xticks_rotation='vertical')
         plt.title('Confusion Matrix')
         plt.show()
+
+        # Print classification report
+        self._print_classification_report(all_labels, all_preds)
 
     def save_model(self, path):
         """Saves the current model to the specified path."""
@@ -366,6 +378,16 @@ class ImageClassifierTrainer:
         plt.title('Training and Validation Accuracy')
         plt.legend()
         plt.show()
+
+
+    def _print_classification_report(self, true_labels, predicted_labels):
+        """
+        Generates and prints a classification report.
+        """
+        report = classification_report(true_labels, predicted_labels, target_names=self.class_names)
+        print("\nClassification Report:")
+        print(report)
+
 
 if __name__ == '__main__':
     data_dir = os.path.join('datasets', 'Classification')
