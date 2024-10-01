@@ -45,7 +45,7 @@ def evaluate_image(evaluators, image_path, sample_prompt = "Describe the image:"
         print(f"{name} Output: {results[name]} (Evaluated in {end_time - start_time:.2f} seconds)")
 
     image_name = os.path.basename(image_path)
-    plotting.show_prediction_result(image_path, image_name, sample_prompt, results)
+    return plotting.show_prediction_result(image_path, image_name, sample_prompt, results)
 
 
 
