@@ -46,4 +46,4 @@ if __name__ == "__main__":
 
     results = evaluate_dataset(evaluators, dataset_name, dataset_description, dataset_path, num_images_per_class, num_classes)
 
-    plot_image_grid(results, num_classes)
+    plot_image_grid(results, num_classes, image_name="vlm_classification_results.png")
