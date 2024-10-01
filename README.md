@@ -1,54 +1,31 @@
 # Microscopy Image Analysis
 
-This repository contains tools and models for analyzing microscopy images using vision language and vision models. The project leverages state-of-the-art machine learning techniques to provide accurate and efficient image analysis.
+This is a project for image analysis in microscopy. The project is part of the DFG Project **Appl-FM**.
 
-This work is part of the DFG Project Appl-FM.
+**Note:** This repository is currently not operational and should be considered a playground. Implementation is still in progress.
 
-## Features
+## Overview
 
-- \*\*Image Segmentation\*\*: Automatically segment microscopy images into meaningful regions.
-- \*\*Object Detection\*\*: Detect and classify objects within microscopy images.
-- \*\*Image Classification\*\*: Classify microscopy images into predefined categories.
-
+The goal of this project is to develop algorithms and tools for automated analysis of microscopic images. This includes functions like image preprocessing, segmentation, feature extraction, and data visualization.
 
 ## Installation
 
-To install the required dependencies, run:
+All required packages can be installed using the `requirements.txt` file:
 
-\`\`\`bash
+```bash
 pip install -r requirements.txt
-\`\`\`
 
 ## Usage
 
-### Image Segmentation
-#### THIS IS NOT IMPLEMENTED YET
-\`\`\`python
-from segmentation import segment_image
+Currently, there are no usable scripts or applications. Please check back regularly for updates.
 
-image_path = 'path/to/image.png'
-segmented_image = segment_image(image_path)
-\`\`\`
-
-### Object Detection
-#### THIS IS NOT IMPLEMENTED YET
-\`\`\`python
-from detection import detect_objects
-
-image_path = 'path/to/image.png'
-detections = detect_objects(image_path)
-\`\`\`
-
-### Image Classification
-#### THIS IS NOT IMPLEMENTED YET
-\`\`\`python
-from classification import classify_image
-
-image_path = 'path/to/image.png'
-classification = classify_image(image_path)
-\`\`\`
+## Datasets
+Relevant datasets can be automatically downloaded using the datasets.py script.
 
 ## Contributing
 
-Contributions are welcome! Please submit a pull request or open an issue to discuss your ideas.
+Contributions are welcome! If you have ideas or suggestions for improvement, please open an issue or a pull request.
 
+## Contact
+
+For questions, please contact <mario.koddenbrock@htw-berlin.de> 
