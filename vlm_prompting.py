@@ -2,6 +2,7 @@ import warnings
 
 import torch
 
+from plotting import plot_image_grid
 from utils import initialize_evaluators, evaluate_image
 from vlm.blip_2 import BLIP2Evaluator
 from vlm.blip import BLIPEvaluator
@@ -45,7 +46,11 @@ if __name__ == "__main__":
 
     # Prompt to use for evaluation
     prompt = "Describe the image:"
+    result_images = []
 
     # Iterate over each dataset and evaluate
     for image_path in image_pathes:
-        evaluate_image(evaluators, image_path, prompt)
+        result_image_path = evaluate_image(evaluators, image_path, prompt)
+        result_images.append(result_image_path)
+
+    plot_image_grid(result_images, 2, rows=1, image_name="vlm_prompting_results.png")
