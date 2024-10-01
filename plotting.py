@@ -36,10 +36,10 @@ def show_prediction_result(image_path, dataset_name, ground_truth, results):
     ax.text(
         0.95, 0.05, text_str,
         transform=ax.transAxes,  # Position relative to axes
-        fontsize=8,  # Smaller font size
+        fontsize=15,  # Smaller font size
         verticalalignment='bottom',  # Align text box at the bottom
         horizontalalignment='right',  # Align text box to the right
-        bbox={'facecolor': 'white', 'alpha': 0.7, 'pad': 5}  # White background with transparency
+        bbox={'facecolor': 'white', 'alpha': 0.5, 'pad': 5}  # White background with transparency
     )
 
     # filename of the input image
@@ -160,7 +160,7 @@ def plot_image_grid(image_list, num_classes=33, figsize=(30, 30)):
     # Save the plot to the specified output file
     plt.tight_layout()
     plt.savefig(save_to, bbox_inches='tight', dpi=300)
-    plt.close()
+    # plt.close()
 
 
 if __name__ == '__main__':
