@@ -39,13 +39,19 @@ def show_prediction_result(image_path, dataset_name, ground_truth, results):
         fontsize=15,  # Smaller font size
         verticalalignment='bottom',  # Align text box at the bottom
         horizontalalignment='right',  # Align text box to the right
-        bbox={'facecolor': 'white', 'alpha': 0.5, 'pad': 5}  # White background with transparency
+        bbox={'facecolor': 'white', 'alpha': 0.5, 'pad': 5},  # White background with transparency
+        wrap=True,  # Wrap text if it exceeds the width of the image
     )
 
     # filename of the input image
     image_name = os.path.basename(image_path)
     image_name = image_name.replace(".png", "")
     image_name = image_name.replace(".tif", "")
+    image_name = image_name.replace(".jpg", "")
+
+    # Replace spaces and colons in the ground truth label
+    ground_truth = ground_truth.replace(" ", "_")
+    ground_truth = ground_truth.replace(":", "_")
 
     # Save the image with the predictions
     image_name = f"{ground_truth}_{image_name}.png"
@@ -125,7 +131,7 @@ def visualize_class_samples(dataset, class_names, num_classes=8, image_size=(224
     plt.show()
 
 
-def plot_image_grid(image_list, num_classes=33, figsize=(30, 30)):
+def plot_image_grid(image_list, num_classes=33, figsize=(20, 20), rows=5, image_name="vlm_results.png"):
     """
     Plots a grid of images from a list.
 
@@ -134,7 +140,6 @@ def plot_image_grid(image_list, num_classes=33, figsize=(30, 30)):
     figsize (tuple): Size of the figure (optional).
     """
 
-    rows = 5
     cols = (num_classes + rows - 1) // rows  # Ensures we get enough columns
 
     fig, axes = plt.subplots(cols, rows, figsize=figsize)
@@ -145,7 +150,7 @@ def plot_image_grid(image_list, num_classes=33, figsize=(30, 30)):
             # Check if the item in the list is an image path or an already loaded image
             if isinstance(image_list[i], str):
                 # If it's a string (i.e., a file path), load the image
-                img = Image.open(image_list[i])
+                img = pil_loader(image_list[i])
             else:
                 # Otherwise, assume it's already an image array
                 img = image_list[i]
@@ -155,7 +160,7 @@ def plot_image_grid(image_list, num_classes=33, figsize=(30, 30)):
         ax.axis('off')  # Hide the axes
 
 
-    save_to = os.path.join("results", "Classification", "vlm_results.png")
+    save_to = os.path.join("results", "Classification", image_name)
 
     # Save the plot to the specified output file
     plt.tight_layout()
