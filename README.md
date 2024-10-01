@@ -22,9 +22,8 @@ pip install -r requirements.txt
 ## Usage
 
 ### Image Segmentation
-
+#### THIS IS NOT IMPLEMENTED YET
 \`\`\`python
-# THIS IS NOT IMPLEMENTED YET
 from segmentation import segment_image
 
 image_path = 'path/to/image.png'
@@ -32,9 +31,8 @@ segmented_image = segment_image(image_path)
 \`\`\`
 
 ### Object Detection
-
+#### THIS IS NOT IMPLEMENTED YET
 \`\`\`python
-# THIS IS NOT IMPLEMENTED YET
 from detection import detect_objects
 
 image_path = 'path/to/image.png'
@@ -42,9 +40,8 @@ detections = detect_objects(image_path)
 \`\`\`
 
 ### Image Classification
-
+#### THIS IS NOT IMPLEMENTED YET
 \`\`\`python
-# THIS IS NOT IMPLEMENTED YET
 from classification import classify_image
 
 image_path = 'path/to/image.png'
