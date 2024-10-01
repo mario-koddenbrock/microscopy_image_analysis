@@ -27,16 +27,15 @@ def initialize_evaluators(device, config):
     return evaluators
 
 
-def evaluate_image(evaluators, image_path):
+def evaluate_image(evaluators, image_path, sample_prompt = "Describe the image:"):
     """
     Evaluate an image using the provided evaluators.
 
     Args:
+        sample_prompt (str): The prompt to use for evaluation.
         evaluators (dict): Dictionary of initialized evaluators.
         image_path (str): Path to the image to evaluate.
     """
-    # sample_prompt = prompts.classification_prompt() # TODO: Implement this
-    sample_prompt = "Describe the image:"
 
     results = {name: "default_result" for name in evaluators.keys()}
     for name, evaluator in evaluators.items():
@@ -46,7 +45,7 @@ def evaluate_image(evaluators, image_path):
         print(f"{name} Output: {results[name]} (Evaluated in {end_time - start_time:.2f} seconds)")
 
     image_name = os.path.basename(image_path)
-    plotting.show_prediction_result(image_path, image_name, "Unknown", results)
+    plotting.show_prediction_result(image_path, image_name, sample_prompt, results)
 
 
 
