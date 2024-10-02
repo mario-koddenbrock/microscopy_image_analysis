@@ -75,7 +75,7 @@ class DatasetDownloader:
         self.datasets = datasets
         # Set default download directory if none provided
         if download_dir is None:
-            self.download_dir = os.path.join('datasets', 'Segmentation')
+            self.download_dir = os.path.join('../datasets', 'Segmentation')
         else:
             self.download_dir = download_dir
         os.makedirs(self.download_dir, exist_ok=True)
@@ -242,13 +242,13 @@ class DatasetDownloader:
 # Usage example:
 if __name__ == '__main__':
     # Classification datasets
-    downloader = DatasetDownloader(classification_datasets, download_dir=os.path.join('datasets', 'Classification'))
+    downloader = DatasetDownloader(classification_datasets, download_dir=os.path.join('../datasets', 'Classification'))
     downloader.download_and_extract()
 
     # Segmentation datasets
-    downloader = DatasetDownloader(segmentation_datasets, download_dir=os.path.join('datasets', 'Segmentation'))
+    downloader = DatasetDownloader(segmentation_datasets, download_dir=os.path.join('../datasets', 'Segmentation'))
     downloader.download_and_extract()
 
     # Object detection datasets
-    downloader = DatasetDownloader(object_detection_datasets, download_dir=os.path.join('datasets', 'ObjectDetection'))
+    downloader = DatasetDownloader(object_detection_datasets, download_dir=os.path.join('../datasets', 'ObjectDetection'))
     downloader.download_and_extract()

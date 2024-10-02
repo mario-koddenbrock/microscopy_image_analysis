@@ -2,16 +2,9 @@ import warnings
 
 import torch
 
-from plotting import plot_image_grid
-from utils import initialize_evaluators, evaluate_image
-from vlm.blip_2 import BLIP2Evaluator
-from vlm.blip import BLIPEvaluator
-from vlm.clip import CLIPEvaluator
+from mia.plotting import plot_image_grid
+from mia.utils import initialize_evaluators, evaluate_image
 from vlm.pali_gemma import PaliGemmaEvaluator
-from vlm.phi_vision import PhiVisionEvaluator
-from vlm.qwen_vl import QwenVLEvaluator
-from vlm.vilt import ViltEvaluator
-from vlm.visual_bert import VisualBertEvaluator
 
 # Ignore warnings
 warnings.filterwarnings("ignore")

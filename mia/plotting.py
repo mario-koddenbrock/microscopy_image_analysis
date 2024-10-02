@@ -3,10 +3,9 @@ import os.path
 
 import matplotlib.pyplot as plt
 import numpy as np
-from PIL import Image
 from torchvision import transforms, datasets
 
-from file_io import pil_loader, rasterio_loader
+from mia import file_io
 
 
 def show_prediction_result(image_path, dataset_name, ground_truth, results):
@@ -20,7 +19,7 @@ def show_prediction_result(image_path, dataset_name, ground_truth, results):
         results (dict): Dictionary of VLM results with VLM names as keys and their outputs as values.
     """
 
-    image = pil_loader(image_path)
+    image = file_io.pil_loader(image_path)
 
     # Set up the figure and axes for plotting
     fig, ax = plt.subplots(figsize=(8, 10))
@@ -85,7 +84,7 @@ def visualize_class_samples(dataset, class_names, num_classes=8, image_size=(224
     for path, label in dataset.samples:  # dataset.samples contains paths and labels
         class_name = class_names[label]
         if class_name not in class_images:
-            class_images[class_name] = rasterio_loader(path)  # Load image using rasterio_loader
+            class_images[class_name] = file_io.rasterio_loader(path)  # Load image using rasterio_loader
         if len(class_images) == num_classes:
             break
 
@@ -150,7 +149,7 @@ def plot_image_grid(image_list, num_classes=33, figsize=(20, 20), rows=5, image_
             # Check if the item in the list is an image path or an already loaded image
             if isinstance(image_list[i], str):
                 # If it's a string (i.e., a file path), load the image
-                img = pil_loader(image_list[i])
+                img = file_io.pil_loader(image_list[i])
             else:
                 # Otherwise, assume it's already an image array
                 img = image_list[i]
@@ -169,7 +168,7 @@ def plot_image_grid(image_list, num_classes=33, figsize=(20, 20), rows=5, image_
 
 
 if __name__ == '__main__':
-    data_dir = os.path.join('datasets', 'Classification')
+    data_dir = os.path.join('../datasets', 'Classification')
 
     # Load the dataset (without splitting) to visualize images
     full_dataset = datasets.ImageFolder(data_dir, transform=transforms.ToTensor())

@@ -1,7 +1,7 @@
 import torch
 from transformers import CLIPProcessor, CLIPModel
 
-from file_io import pil_loader
+from mia.file_io import pil_loader
 
 
 class CLIPEvaluator:

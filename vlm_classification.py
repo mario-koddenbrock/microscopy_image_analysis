@@ -1,16 +1,8 @@
 import torch
 
-from plotting import plot_image_grid
-from utils import initialize_evaluators, evaluate_dataset
-from vlm.blip_2 import BLIP2Evaluator
-from vlm.blip import BLIPEvaluator
+from mia.plotting import plot_image_grid
+from mia.utils import initialize_evaluators, evaluate_dataset
 from vlm.clip import CLIPEvaluator
-from vlm.pali_gemma import PaliGemmaEvaluator
-from vlm.phi_vision import PhiVisionEvaluator
-from vlm.qwen_vl import QwenVLEvaluator
-from vlm.vilt import ViltEvaluator
-from vlm.visual_bert import VisualBertEvaluator
-
 
 if __name__ == "__main__":
     # Determine the device to use (GPU if available, otherwise CPU)

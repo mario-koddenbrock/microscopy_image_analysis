@@ -1,5 +1,7 @@
 import unittest
+
 from vlm.qwen_vl import QwenVLEvaluator
+
 
 class TestQwenVLEvaluator(unittest.TestCase):
     def setUp(self):

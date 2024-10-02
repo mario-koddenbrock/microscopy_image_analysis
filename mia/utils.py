@@ -1,8 +1,7 @@
 import os.path
 import time
 
-import plotting
-import prompts
+from mia import plotting, prompts
 from vlm.clip import CLIPEvaluator
 from vlm.visual_bert import VisualBertEvaluator
 
@@ -66,7 +65,7 @@ def evaluate_dataset(evaluators, dataset_name, dataset_description, dataset_path
         return
 
     print(f"Dataset: {dataset_name}")
-    sample_prompt = prompts.classification_prompt(dataset_name=dataset_name, dataset_description=dataset_description)
+    prompt = prompts.classification_prompt(dataset_name=dataset_name, dataset_description=dataset_description)
 
     result_images = []
     for class_idx, class_name in enumerate(classes[:num_classes]):
@@ -83,7 +82,7 @@ def evaluate_dataset(evaluators, dataset_name, dataset_description, dataset_path
                     evaluator.set_class_names(classes)
 
                 start_time = time.time()
-                results[name] = evaluator.evaluate(prompt=sample_prompt, image_path=sample_image_url)
+                results[name] = evaluator.evaluate(prompt=prompt, image_path=sample_image_url)
                 end_time = time.time()
                 print(f"\t\t{name} Output: {results[name]} (Evaluated in {end_time - start_time:.2f} seconds)")
 

@@ -1,5 +1,7 @@
 import unittest
+
 from vlm.clip import CLIPEvaluator
+
 
 class TestCLIPEvaluator(unittest.TestCase):
     def setUp(self):

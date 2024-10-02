@@ -1,4 +1,4 @@
-import utils
+from mia import utils
 
 
 def classification_prompt(
@@ -35,7 +35,7 @@ if __name__ == "__main__":
     The images were taken with a microscope and analyzed using Convolutional Neural Networks (CNNs) and machine learning classifiers like Support Vector Machines (SVM) and Random Forest. 
     The dataset is publicly available for research purposes, allowing for advancements in bacterial recognition systems.
     '''
-    dataset_path = 'datasets/Classification'
+    dataset_path = '../datasets/Classification'
     num_images = 1
 
     prompt = classification_prompt(dataset_name, dataset_description, dataset_path)

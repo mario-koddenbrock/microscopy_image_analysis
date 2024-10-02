@@ -1,5 +1,7 @@
 import unittest
+
 from vlm.blip_2 import BLIP2Evaluator
+
 
 class TestBLIP2Evaluator(unittest.TestCase):
     def setUp(self):

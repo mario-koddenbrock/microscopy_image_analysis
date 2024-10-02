@@ -1,5 +1,7 @@
 import unittest
+
 from vlm.pali_gemma import PaliGemmaEvaluator
+
 
 class TestPaliGemmaEvaluator(unittest.TestCase):
     def setUp(self):

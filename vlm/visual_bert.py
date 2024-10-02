@@ -1,7 +1,6 @@
 from transformers import VisualBertModel, BertTokenizer, ViltProcessor
-from PIL import Image
 
-from file_io import pil_loader
+from mia.file_io import pil_loader
 
 
 class VisualBertEvaluator:

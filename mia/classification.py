@@ -206,7 +206,7 @@ class ImageClassifierTrainer:
         best_val_loss = np.inf
 
         # Ensure the models directory exists
-        models_dir = os.path.join('models', 'Classification')
+        models_dir = os.path.join('../models', 'Classification')
         os.makedirs(models_dir, exist_ok=True)
         self.model_path = os.path.join(models_dir, f'best_model_{self.model_name}.pt')
 
@@ -389,8 +389,8 @@ class ImageClassifierTrainer:
 
 
 if __name__ == '__main__':
-    data_dir = os.path.join('datasets', 'Classification')
-    models_dir = os.path.join('models', 'Classification')
+    data_dir = os.path.join('../datasets', 'Classification')
+    models_dir = os.path.join('../models', 'Classification')
     os.makedirs(models_dir, exist_ok=True)
 
     # Specify the model architecture you want to use

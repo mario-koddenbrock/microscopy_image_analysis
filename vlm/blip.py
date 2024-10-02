@@ -1,6 +1,6 @@
 from transformers import BlipProcessor, BlipForConditionalGeneration
 
-from file_io import pil_loader
+from mia.file_io import pil_loader
 
 
 class BLIPEvaluator:

@@ -1,5 +1,5 @@
 from transformers import Blip2ForConditionalGeneration, Blip2Processor
-from file_io import pil_loader
+from mia.file_io import pil_loader
 
 
 class BLIP2Evaluator:
