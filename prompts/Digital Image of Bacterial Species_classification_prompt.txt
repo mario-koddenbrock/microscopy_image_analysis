@@ -1,0 +1,14 @@
+
+I have a dataset titled 'Digital Image of Bacterial Species' with the following description: 
+
+The dataset from the study "Deep learning approach to bacterial colony classification" comprises 660 images representing 33 different genera and species of bacteria. 
+This dataset, called DIBaS (Digital Image of Bacterial Species), was created for bacterial classification using deep learning methods. 
+The images were taken with a microscope and analyzed using Convolutional Neural Networks (CNNs) and machine learning classifiers like Support Vector Machines (SVM) and Random Forest. 
+The dataset is publicly available for research purposes, allowing for advancements in bacterial recognition systems.
+
+
+The dataset consists of images of the following classes: ['Proteus', 'Lactobacillus.plantarum', 'Lactobacillus.johnsonii', 'Lactobacillus.rhamnosus', 'Lactobacillus.jehnsenii', 'Acinetobacter.baumanii', 'Neisseria.gonorrhoeae', 'Clostridium.perfringens', 'Enterococcus.faecium', 'Staphylococcus.saprophiticus', 'Micrococcus.spp', 'Lactobacillus.paracasei', 'Bifidobacterium.spp', 'Actinomyces.israeli', 'Lactobacillus.delbrueckii', 'Porfyromonas.gingivalis', 'Lactobacillus.casei', 'Pseudomonas.aeruginosa', 'Listeria.monocytogenes', 'Lactobacillus.reuteri', 'Enterococcus.faecalis', 'Bacteroides.fragilis', 'Escherichia.coli', 'Candida.albicans', 'Staphylococcus.epidermidis', 'Lactobacillus.crispatus', 'Streptococcus.agalactiae', 'Fusobacterium', 'Veionella', 'Staphylococcus.aureus', 'Propionibacterium.acnes', 'Lactobacillus.salivarius', 'Lactobacillus.gasseri'].
+
+Here is a sample image from the dataset. Classify the image into one of the classes.
+Only return the class label.
+            
