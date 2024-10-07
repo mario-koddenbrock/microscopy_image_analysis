@@ -48,5 +48,8 @@ class PhiVisionEvaluator:
 if __name__ == "__main__":
     # Usage example
     evaluator = PhiVisionEvaluator(device="cuda")  # For GPU, or "cpu" for CPU
-    result = evaluator.evaluate(prompt="Describe the image.", image_path="https://example.com/sample-image.jpg")
+    result = evaluator.evaluate(image_path="https://upload.wikimedia.org/wikipedia/commons/9/99/Brooks_Chase_Ranger_of_Jolly_Dogs_Jack_Russell.jpg")
+    print(result)
+
+    result = evaluator.evaluate(image_path="https://upload.wikimedia.org/wikipedia/commons/thumb/a/a4/2019_Toyota_Corolla_Icon_Tech_VVT-i_Hybrid_1.8.jpg/500px-2019_Toyota_Corolla_Icon_Tech_VVT-i_Hybrid_1.8.jpg")
     print(result)
