@@ -78,7 +78,9 @@ def evaluate_dataset(evaluators, dataset_name, dataset_description, dataset_path
 
             for name, evaluator in evaluators.items():
 
-                if isinstance(evaluator, CLIPEvaluator) or isinstance(evaluator, VisualBertEvaluator):
+                # if the evaluator has a method set_class_names, set the class names
+                set_class_names_op = getattr(evaluator, "set_class_names", None)
+                if callable(set_class_names_op):
                     evaluator.set_class_names(classes)
 
                 start_time = time.time()
