@@ -17,8 +17,7 @@ pip install -r requirements.txt
 ```
 
 ## Usage
-
-Currently, there are no usable scripts or applications. Please check back regularly for updates.
+A first draft is available at classification.ipynb. Please note: Work in progress
 
 ## Datasets
 Relevant datasets can be automatically downloaded using the datasets.py script.
