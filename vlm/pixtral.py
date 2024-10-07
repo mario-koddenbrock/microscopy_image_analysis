@@ -1,10 +1,9 @@
 import base64
 import os
 
-from mistralai import Mistral
-from transformers import AutoModelForCausalLM, AutoProcessor
-from utils import load_and_convert_image
 from dotenv import load_dotenv
+from mistralai import Mistral
+
 load_dotenv()
 
 class PixtralVisionEvaluator:
@@ -14,12 +13,22 @@ class PixtralVisionEvaluator:
         self.client = Mistral(api_key=api_key)
 
     def _load_image(self, image_path):
-        with open(image_path, "rb") as image_file:
-            return base64.b64encode(image_file.read()).decode("utf-8")
+
+        if image_path.startswith('http://') or image_path.startswith('https://'):
+            return image_path
+        elif os.path.exists(image_path):
+            with open(image_path, "rb") as image_file:
+                base64_image = base64.b64encode(image_file.read()).decode("utf-8")
+                return f"data:image/jpeg;base64,{base64_image}"
+        else:
+            raise ValueError(f"Invalid image path: {image_path}")
+
+
+
 
     def evaluate(self, prompt, image_path):
         # # Load the image (from URL or local path)
-        base_64_image = self._load_image(image_path)
+        image = self._load_image(image_path)
 
         chat_response = self.client.chat.complete(
             model=self.model,
@@ -33,7 +42,7 @@ class PixtralVisionEvaluator:
                         },
                         {
                             "type": "image_url",
-                            "image_url": f"data:image/jpeg;base64,{base_64_image}"
+                            "image_url": image
                         }
                     ]
                 },
