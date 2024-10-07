@@ -22,6 +22,6 @@ class ViltEvaluator:
     def evaluate(self, prompt, image_path):
         # Load the image (from URL or local)
         image = self._load_image(image_path)
-        inputs = self.processor(prompt, images=image, return_tensors="pt").to(self.device)
+        inputs = self.processor(text=prompt, images=image, return_tensors="pt").to(self.device)
         outputs = self.model.generate(**inputs)
         return self.processor.decode(outputs[0], skip_special_tokens=True)
