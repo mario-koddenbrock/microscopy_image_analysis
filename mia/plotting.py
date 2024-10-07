@@ -29,6 +29,12 @@ def show_prediction_result(image_path, dataset_name, ground_truth, results):
     # Prepare the text to display (ground truth and VLM results)
     text_str = f"Ground Truth: {ground_truth}\n\n"
     for vlm_name, vlm_result in results.items():
+
+        # shorten text if its too long
+        threshold = 25
+        if len(vlm_result) > threshold:
+            vlm_result = vlm_result[:threshold] + "..."
+
         text_str += f"{vlm_name}: {vlm_result}\n\n"
 
     # Add the text box in the bottom-right corner
