@@ -39,6 +39,7 @@ Some datasets can be automatically downloaded using the `datasets.py` script, wh
 | 3D Segmentation       | 3DCellSeg                             | 3D cell segmentation using deep learning.                        | [3DCellSeg Project](https://github.com/AntonotnaWang/3DCellSeg)                                |
 | 3D Segmentation       | StarDist                              | Star-convex shape models for 3D microscopy images.               | [StarDist Project](https://github.com/stardist/stardist)                                       |
 | 2D Segmentation       | Automatic SEM Image Segmentation      | 2D segmentation of SEM images.                                   | [Automatic SEM Image Segmentation Project](https://github.com/BAMresearch/automatic-sem-image-segmentation) |
+| General Resource      | BioImage.io                           | A resource for bioimage models and datasets.                     | [BioImage.io](https://bioimage.io/#/)                                                          |
 
 ## Contributing
 
