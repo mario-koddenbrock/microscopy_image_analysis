@@ -1,9 +1,11 @@
+import datetime
 import glob
 import os
 
 import cellpose
 import napari
 import numpy as np
+import wandb
 from cellpose import models, io
 from cellpose.metrics import aggregated_jaccard_index, average_precision
 from napari_animation import Animation
@@ -11,34 +13,36 @@ from napari_animation import Animation
 from mia.cellpose import evaluation_params
 from mia.hash import compute_hash, load_from_cache, save_to_cache
 from mia.results import ResultHandler
+from mia.utils import check_set_gpu, check_paths
 
 # Set the path to the ffmpeg executable - only needed for exporting animations
 os.environ["IMAGEIO_FFMPEG_EXE"] = "/opt/homebrew/bin/ffmpeg"
 print(f"Cellpose version: {cellpose.version}")
 
 
-# TODO log to wandb
+def optimize_parameters(image_dir, output_dir, cache_dir="cache"):
 
-def optimize_parameters(image, output_dir, cache_dir="cache"):
-    if not os.path.exists(image_dir):
-        raise FileNotFoundError(f"Directory not found: {image_dir}")
-
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-
-    if not os.path.exists(cache_dir):
-        os.makedirs(cache_dir)
+    check_paths(image_dir, output_dir, cache_dir)
 
     # Do you want to show the viewer?
     show_viewer = False
     caching = False
 
+    run_name = f"{os.path.basename(image_dir)}_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
+    wandb.init(
+        project="organoid_segmentation",
+        name=run_name,
+    )
+
+    # get available torch device (CPU, GPU or MPS)
+    device = check_set_gpu()
+
     # Load the Cellpose model
     model_dict = {
-        "cyto": models.Cellpose(model_type='cyto', gpu=False),
-        "cyto2": models.Cellpose(model_type='cyto2', gpu=False),
-        "cyto3": models.Cellpose(model_type='cyto3', gpu=False),
-        "nuclei": models.Cellpose(model_type='nuclei', gpu=False),
+        "cyto": models.Cellpose(model_type='cyto', device=device),
+        "cyto2": models.Cellpose(model_type='cyto2', device=device),
+        "cyto3": models.Cellpose(model_type='cyto3', device=device),
+        "nuclei": models.Cellpose(model_type='nuclei', device=device),
     }
 
     # Get the list of images
@@ -70,11 +74,10 @@ def optimize_parameters(image, output_dir, cache_dir="cache"):
             if result_handler.is_result_present(params):
                 continue  # Skip if result already exists
 
-            # iterate over all cellpose models
-            model =model_dict[params["model_name"]]
-
             cache_key = compute_hash(image, params)
             cached_result = load_from_cache(cache_dir, cache_key)
+
+            print(f"Processing image {image_name} with parameters: {params}")
 
             try:
                 if caching and cached_result:
@@ -82,6 +85,7 @@ def optimize_parameters(image, output_dir, cache_dir="cache"):
                     masks, flows, styles, diams = cached_result
                 else:
                     print(f"No cache found...")
+                    model = model_dict[params["model_name"]]
                     masks, flows, styles, diams = model.eval(
                         image,
                         channels=[params["channel_segment"], params["channel_nuclei"]],
@@ -94,19 +98,22 @@ def optimize_parameters(image, output_dir, cache_dir="cache"):
                     )
                     save_to_cache(cache_dir, cache_key, masks, flows, styles, diams)
 
-                if ground_truth is not None:
-                    simple_jaccard = simple_iou(ground_truth, masks)
-                    # jaccard = jaccard_score(ground_truth, masks)
-                    # fscore = f1_score(ground_truth, masks)
-                    # precision, recall, fscore = boundary_scores(ground_truth, masks)
-                else:
-                    simple_jaccard = -42
-
+                simple_jaccard = simple_iou(ground_truth, masks)
+                # jaccard = jaccard_score(ground_truth, masks)
+                # fscore = f1_score(ground_truth, masks)
+                # precision, recall, fscore = boundary_scores(ground_truth, masks)
 
             except Exception as e:
-                simple_jaccard = -1
+                print(f"Error: {e}")
+                continue
 
-
+            # Log to W&B
+            wandb.log({
+                **params,
+                "simple_jaccard": simple_jaccard,
+                "image_name": image_name,
+                "image_idx": image_idx,
+            })
 
             result_handler.log_result(params, simple_jaccard, -1)
 
@@ -138,17 +145,13 @@ def optimize_parameters(image, output_dir, cache_dir="cache"):
 
         if image_idx > 10:
             break
+    wandb.finish()
+
+
 
 def view(image_dir, output_dir, cache_dir="cache"):
 
-    if not os.path.exists(image_dir):
-        raise FileNotFoundError(f"Directory not found: {image_dir}")
-
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-
-    if not os.path.exists(cache_dir):
-        os.makedirs(cache_dir)
+    check_paths(image_dir, output_dir, cache_dir)
 
     # Do you want to show the viewer or export the video?
     # TODO: they are mutually exclusive right now

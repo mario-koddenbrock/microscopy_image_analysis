@@ -16,7 +16,7 @@ channel_axis_list = [None] # TODO
 invert_list = [False, True]
 normalize_list = [False, True] # TODO iterate over normalization parameters
 diameter_list = [None, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100] # TODO
-do_3D_list = [True, False]
+do_3D_list = [True] # TODO try False too
 model_list = ["cyto", "cyto2", "cyto3", "nuclei"]
 
 

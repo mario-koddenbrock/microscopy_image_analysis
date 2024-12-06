@@ -3,9 +3,20 @@ import os
 
 
 class ResultHandler:
-    def __init__(self, result_path, fieldnames):
+    def __init__(self, result_path):
         self.result_path = result_path
-        self.fieldnames = fieldnames
+        self.fieldnames = [
+            "model_name",
+            "channel_segment",
+            "channel_nuclei",
+            "channel_axis",
+            "invert",
+            "normalize",
+            "diameter",
+            "do_3D",
+            "jaccard",
+            "f1_score",
+        ]
         self.existing_results = []
 
 

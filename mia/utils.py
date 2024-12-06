@@ -1,9 +1,37 @@
 import os.path
 import time
 
+import torch
+
 from mia import plotting, prompts
 from vlm.clip import CLIPEvaluator
 from vlm.visual_bert import VisualBertEvaluator
+
+
+def check_set_gpu(override=None):
+    if override is None:
+        if torch.cuda.is_available():
+            device = torch.device('cuda')
+            print(f"Using GPU: {torch.cuda.get_device_name(0)}")
+        elif torch.backends.mps.is_available():
+            device = torch.device('mps')
+            print(f"Using MPS: {torch.backends.mps.is_available()}")
+        else:
+            device = torch.device('cpu')
+            print(f"Using CPU: {torch.device('cpu')}")
+    else:
+        device = torch.device(override)
+
+    return device
+
+
+def check_paths(image_dir, output_dir, cache_dir):
+    if not os.path.exists(image_dir):
+        raise FileNotFoundError(f"Directory not found: {image_dir}")
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    if not os.path.exists(cache_dir):
+        os.makedirs(cache_dir)
 
 
 def initialize_evaluators(device, config):
@@ -140,7 +168,3 @@ def get_dataset_classes(dataset_path):
     classes = [f for f in folder if not f.startswith(".")]
 
     return classes
-
-
-
-
