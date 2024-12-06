@@ -1,22 +1,23 @@
 import glob
 import os
+
 import cellpose
-import matplotlib
 import napari
 import numpy as np
 from cellpose import models, io
+from cellpose.metrics import aggregated_jaccard_index, average_precision
 from napari_animation import Animation
-from skimage.exposure import rescale_intensity
 
 from mia.cellpose import evaluation_params
 from mia.hash import compute_hash, load_from_cache, save_to_cache
+from mia.results import ResultHandler
 
 # Set the path to the ffmpeg executable - only needed for exporting animations
 os.environ["IMAGEIO_FFMPEG_EXE"] = "/opt/homebrew/bin/ffmpeg"
 print(f"Cellpose version: {cellpose.version}")
 
 
-
+# TODO log to wandb
 
 def optimize_parameters(image, output_dir, cache_dir="cache"):
     if not os.path.exists(image_dir):
@@ -30,6 +31,7 @@ def optimize_parameters(image, output_dir, cache_dir="cache"):
 
     # Do you want to show the viewer?
     show_viewer = False
+    caching = False
 
     # Load the Cellpose model
     model_dict = {
@@ -42,28 +44,44 @@ def optimize_parameters(image, output_dir, cache_dir="cache"):
     # Get the list of images
     image_paths = glob.glob(os.path.join(image_dir, "*.tif"))
 
+    result_path = os.path.join(output_dir, "results.csv")
+    if os.path.exists(result_path):
+        os.remove(result_path)
+
+    result_handler = ResultHandler(result_path)
+
     # Loop over the images
     for image_idx, image_path in enumerate(image_paths[1:]):
 
         image_name = os.path.basename(image_path).replace(".tif", "")
+        ground_truth_path = image_path.replace("images", "Manual_meshes").replace(".tif", "-labels.tif")
+
+        if os.path.exists(ground_truth_path):
+            ground_truth = io.imread(ground_truth_path)
+        else:
+            print(f"Ground truth not found for {image_name}. Skipping.")
+            continue
 
         # Read image with cellpose.io
         image = io.imread(image_path)
 
-        # iterate over all cellpose models
-        for model_name, model in model_dict.items():
-            print(f"Running model: {model_name}")
+        for params in evaluation_params:
 
-            for params in evaluation_params:
+            if result_handler.is_result_present(params):
+                continue  # Skip if result already exists
 
-                cache_key = compute_hash(image, params.update({"model_name": model_name}))
-                cached_result = load_from_cache(cache_dir, cache_key)
+            # iterate over all cellpose models
+            model =model_dict[params["model_name"]]
 
-                if cached_result:
-                    print(f"Loaded cached result for {model_name}.")
+            cache_key = compute_hash(image, params)
+            cached_result = load_from_cache(cache_dir, cache_key)
+
+            try:
+                if caching and cached_result:
+                    print(f"Loaded cached result...")
                     masks, flows, styles, diams = cached_result
                 else:
-                    print(f"No cache found. Running eval for {model_name}.")
+                    print(f"No cache found...")
                     masks, flows, styles, diams = model.eval(
                         image,
                         channels=[params["channel_segment"], params["channel_nuclei"]],
@@ -76,31 +94,47 @@ def optimize_parameters(image, output_dir, cache_dir="cache"):
                     )
                     save_to_cache(cache_dir, cache_key, masks, flows, styles, diams)
 
-                if show_viewer:
-                    # Initialize the Napari viewer
-                    viewer = napari.Viewer()
+                if ground_truth is not None:
+                    simple_jaccard = simple_iou(ground_truth, masks)
+                    # jaccard = jaccard_score(ground_truth, masks)
+                    # fscore = f1_score(ground_truth, masks)
+                    # precision, recall, fscore = boundary_scores(ground_truth, masks)
+                else:
+                    simple_jaccard = -42
 
-                    # Add the image to the viewer
-                    viewer.add_image(
-                        image,
-                        contrast_limits=[113, 1300],
-                        name='Organoids',
-                        colormap='gray',
-                    )
 
-                    # Add the labels to the viewer
-                    viewer.add_labels(
-                        masks,
-                        name=model_name,
-                        opacity=0.8,
-                        blending='translucent',
-                    )
+            except Exception as e:
+                simple_jaccard = -1
 
-                    # setting the viewer to the center of the image
-                    center = image.shape[0] // 2
-                    viewer.dims.set_point(0, center)
 
-                    napari.run()
+
+            result_handler.log_result(params, simple_jaccard, -1)
+
+            if show_viewer:
+                # Initialize the Napari viewer
+                viewer = napari.Viewer()
+
+                # Add the image to the viewer
+                viewer.add_image(
+                    image,
+                    contrast_limits=[113, 1300],
+                    name='Organoids',
+                    colormap='gray',
+                )
+
+                # Add the labels to the viewer
+                viewer.add_labels(
+                    masks,
+                    name=params["model_name"],
+                    opacity=0.8,
+                    blending='translucent',
+                )
+
+                # setting the viewer to the center of the image
+                center = image.shape[0] // 2
+                viewer.dims.set_point(0, center)
+
+                napari.run()
 
         if image_idx > 10:
             break
@@ -149,8 +183,16 @@ def view(image_dir, output_dir, cache_dir="cache"):
         # Read image with cellpose.io
         image = io.imread(image_path)
 
-        # TODO: contrast normalization on image
-        image = rescale_intensity(image)
+        ground_truth_path = image_path.replace("images", "Manual_meshes").replace(".tif", "-labels.tif")
+
+        if os.path.exists(ground_truth_path):
+            ground_truth = io.imread(ground_truth_path)
+        else:
+            print(f"Ground truth not found for {image_name}. Skipping.")
+            ground_truth = None
+
+        # # TODO: contrast normalization on image
+        # image = rescale_intensity(image)
 
         print(f"image: {image_name}")
         print(f"shape: {image.shape}")
@@ -161,15 +203,18 @@ def view(image_dir, output_dir, cache_dir="cache"):
         for model_name, model in model_dict.items():
             print(f"Running model: {model_name}")
 
-            parameters = {
-                "model_name": model_name,
-                "diameter": None,
-                "channels": channels,
-                "do_3D": True,
-                "z_axis": 0,
+            params = {
+                'model_name': model_name,
+                'channel_segment': 0,
+                'channel_nuclei': 0,
+                'channel_axis': None,
+                'invert': False,
+                'normalize': False,
+                'diameter': None,
+                'do_3D': True,
             }
 
-            cache_key = compute_hash(image, parameters)
+            cache_key = compute_hash(image, params)
             cached_result = load_from_cache(cache_dir, cache_key)
 
             if cached_result:
@@ -179,24 +224,47 @@ def view(image_dir, output_dir, cache_dir="cache"):
                 print(f"No cache found. Running eval for {model_name}.")
                 masks, flows, styles, diams = model.eval(
                     image,
-                    diameter=None,
-                    channels=channels,
-                    do_3D=True,
-                    z_axis=0
+                    channels=[params["channel_segment"], params["channel_nuclei"]],
+                    channel_axis=params["channel_axis"],
+                    invert=params["invert"],
+                    normalize=params["normalize"],
+                    diameter=params["diameter"],
+                    do_3D=params["do_3D"],
+                    z_axis=0,  # TODO: z-axis parameter
                 )
                 save_to_cache(cache_dir, cache_key, masks, flows, styles, diams)
 
             # Initialize the Napari viewer
             viewer = napari.Viewer()
 
-            # Add the image to the viewer
-            viewer.add_image(
-                image,
-                contrast_limits=[113, 1300],
-                name='Organoids',
-                colormap='gray',
-            )
+            if ground_truth is None:
+                # Add the image to the viewer
+                viewer.add_image(
+                    image,
+                    contrast_limits=[113, 1300],
+                    name='Organoids',
+                    colormap='gray',
+                )
 
+
+            if ground_truth is not None:
+                simple_jaccard = simple_iou(ground_truth, masks)
+                jaccard = jaccard_score(ground_truth, masks)
+                fscore = f1_score(ground_truth, masks)
+                # precision, recall, fscore = boundary_scores(ground_truth, masks)
+
+                print(f"Simple Jaccard: {simple_jaccard}")
+                print(f"Jaccard: {jaccard}")
+                print(f"F1-Score: {fscore}")
+                # print(f"Boundaries: {boundaries}")
+
+                viewer.add_image(
+                    ground_truth,
+                    name="Ground truth",
+                    # opacity=0.8,
+                    # blending='translucent',
+                    # colormap=matplotlib.cm.get_cmap('Set1'),
+                )
 
             # Add the labels to the viewer
             viewer.add_labels(
@@ -236,6 +304,29 @@ def view(image_dir, output_dir, cache_dir="cache"):
             break
 
 
+def jaccard_score(ground_truth, masks):
+    aji_scores = aggregated_jaccard_index(ground_truth, masks)
+    return np.mean(aji_scores)
+
+
+def f1_score(ground_truth, masks):
+    ap, tp, fp, fn = average_precision(ground_truth, masks)
+    precision = np.sum(tp) / np.sum(tp + fp)
+    recall = np.sum(tp) / np.sum(tp + fn)
+    if precision + recall == 0:
+        fscore = 0
+    else:
+        fscore = 2 * (precision * recall) / (precision + recall)
+    return fscore
+
+
+def simple_iou(ground_truth, masks):
+    intersection = np.logical_and(ground_truth > 0, masks > 0).sum()
+    union = np.logical_or(ground_truth > 0, masks > 0).sum()
+    simple_jaccard = intersection / union if union > 0 else 0
+    return simple_jaccard
+
+
 if __name__ == "__main__":
 
     # directory containing the images
@@ -244,5 +335,5 @@ if __name__ == "__main__":
     # directory to save the output
     output_dir = "Segmentation/Organoids/20230712_P013T_cropped_isotropic"
 
-    view(image_dir, output_dir)
-    # optimize_parameters(image_dir, output_dir)
+    # view(image_dir, output_dir)
+    optimize_parameters(image_dir, output_dir)

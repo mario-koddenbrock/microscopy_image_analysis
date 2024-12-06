@@ -16,11 +16,15 @@ channel_axis_list = [None] # TODO
 invert_list = [False, True]
 normalize_list = [False, True] # TODO iterate over normalization parameters
 diameter_list = [None, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100] # TODO
-do_3D_list = [False, True]
+do_3D_list = [True, False]
+model_list = ["cyto", "cyto2", "cyto3", "nuclei"]
+
+
 
 # getting dict of all possible parameters
 evaluation_params = [
     {
+        "model_name": m,
         "channel_segment": cs,
         "channel_nuclei": cn,
         "channel_axis": ca,
@@ -29,7 +33,7 @@ evaluation_params = [
         "diameter": dia,
         "do_3D": d3
     }
-    for cs, cn, ca, inv, norm, dia, d3 in itertools.product(
-        channel_segment_list, channel_nuclei_list, channel_axis_list, invert_list, normalize_list, diameter_list, do_3D_list
+    for m, cs, cn, ca, inv, norm, dia, d3 in itertools.product(
+        model_list, channel_segment_list, channel_nuclei_list, channel_axis_list, invert_list, normalize_list, diameter_list, do_3D_list
     )
 ]
