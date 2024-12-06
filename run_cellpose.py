@@ -7,16 +7,103 @@ import numpy as np
 from cellpose import models, io
 from napari_animation import Animation
 from skimage.exposure import rescale_intensity
+
+from mia.cellpose import evaluation_params
 from mia.hash import compute_hash, load_from_cache, save_to_cache
 
 # Set the path to the ffmpeg executable - only needed for exporting animations
 os.environ["IMAGEIO_FFMPEG_EXE"] = "/opt/homebrew/bin/ffmpeg"
 print(f"Cellpose version: {cellpose.version}")
 
-# Do you want to show the viewer or export the video?
-# TODO: they are mutually exclusive right now
-show_viewer = True
-export_video = False
+
+
+
+def optimize_parameters(image, output_dir, cache_dir="cache"):
+    if not os.path.exists(image_dir):
+        raise FileNotFoundError(f"Directory not found: {image_dir}")
+
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    if not os.path.exists(cache_dir):
+        os.makedirs(cache_dir)
+
+    # Do you want to show the viewer?
+    show_viewer = False
+
+    # Load the Cellpose model
+    model_dict = {
+        "cyto": models.Cellpose(model_type='cyto', gpu=False),
+        "cyto2": models.Cellpose(model_type='cyto2', gpu=False),
+        "cyto3": models.Cellpose(model_type='cyto3', gpu=False),
+        "nuclei": models.Cellpose(model_type='nuclei', gpu=False),
+    }
+
+    # Get the list of images
+    image_paths = glob.glob(os.path.join(image_dir, "*.tif"))
+
+    # Loop over the images
+    for image_idx, image_path in enumerate(image_paths[1:]):
+
+        image_name = os.path.basename(image_path).replace(".tif", "")
+
+        # Read image with cellpose.io
+        image = io.imread(image_path)
+
+        # iterate over all cellpose models
+        for model_name, model in model_dict.items():
+            print(f"Running model: {model_name}")
+
+            for params in evaluation_params:
+
+                cache_key = compute_hash(image, params.update({"model_name": model_name}))
+                cached_result = load_from_cache(cache_dir, cache_key)
+
+                if cached_result:
+                    print(f"Loaded cached result for {model_name}.")
+                    masks, flows, styles, diams = cached_result
+                else:
+                    print(f"No cache found. Running eval for {model_name}.")
+                    masks, flows, styles, diams = model.eval(
+                        image,
+                        channels=[params["channel_segment"], params["channel_nuclei"]],
+                        channel_axis=params["channel_axis"],
+                        invert=params["invert"],
+                        normalize=params["normalize"],
+                        diameter=params["diameter"],
+                        do_3D=params["do_3D"],
+                        z_axis=0, # TODO: z-axis parameter
+                    )
+                    save_to_cache(cache_dir, cache_key, masks, flows, styles, diams)
+
+                if show_viewer:
+                    # Initialize the Napari viewer
+                    viewer = napari.Viewer()
+
+                    # Add the image to the viewer
+                    viewer.add_image(
+                        image,
+                        contrast_limits=[113, 1300],
+                        name='Organoids',
+                        colormap='gray',
+                    )
+
+                    # Add the labels to the viewer
+                    viewer.add_labels(
+                        masks,
+                        name=model_name,
+                        opacity=0.8,
+                        blending='translucent',
+                    )
+
+                    # setting the viewer to the center of the image
+                    center = image.shape[0] // 2
+                    viewer.dims.set_point(0, center)
+
+                    napari.run()
+
+        if image_idx > 10:
+            break
 
 def view(image_dir, output_dir, cache_dir="cache"):
 
@@ -28,6 +115,11 @@ def view(image_dir, output_dir, cache_dir="cache"):
 
     if not os.path.exists(cache_dir):
         os.makedirs(cache_dir)
+
+    # Do you want to show the viewer or export the video?
+    # TODO: they are mutually exclusive right now
+    show_viewer = True
+    export_video = False
 
     # List of channels, either of length 2 or of length number of images by 2.
     # First element of list is the channel to segment (0=grayscale, 1=red, 2=green, 3=blue).
@@ -140,10 +232,6 @@ def view(image_dir, output_dir, cache_dir="cache"):
 
                 napari.run()
 
-
-
-
-
         if image_idx > 10:
             break
 
@@ -157,3 +245,4 @@ if __name__ == "__main__":
     output_dir = "Segmentation/Organoids/20230712_P013T_cropped_isotropic"
 
     view(image_dir, output_dir)
+    # optimize_parameters(image_dir, output_dir)
