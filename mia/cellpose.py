@@ -11,11 +11,11 @@ import itertools
 # do_3D (bool, optional): Set to True to run 3D segmentation on 4D image input. Defaults to False.
 
 channel_segment_list = [0, 1, 2, 3]
-channel_nuclei_list = [0, 1, 2, 3]
-channel_axis_list = [None] # TODO
+channel_nuclei_list = [0]
+channel_axis_list = [0] # TODO
 invert_list = [False, True]
 normalize_list = [False, True] # TODO iterate over normalization parameters
-diameter_list = [None, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100] # TODO
+diameter_list = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100] # TODO fruitfull values (btw. None not working for 3D)
 do_3D_list = [True] # TODO try False too
 model_list = ["cyto", "cyto2", "cyto3", "nuclei"]
 

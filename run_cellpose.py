@@ -28,7 +28,8 @@ def optimize_parameters(image_dir, output_dir, cache_dir="cache"):
     show_viewer = False
     caching = False
 
-    run_name = f"{os.path.basename(image_dir)}_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
+    image_folder_name = os.path.basename(image_dir.replace("/images", ""))
+    run_name = f"{image_folder_name}_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
     wandb.init(
         project="organoid_segmentation",
         name=run_name,
@@ -77,7 +78,7 @@ def optimize_parameters(image_dir, output_dir, cache_dir="cache"):
             cache_key = compute_hash(image, params)
             cached_result = load_from_cache(cache_dir, cache_key)
 
-            print(f"Processing image {image_name} with parameters: {params}")
+            print(f"Processing image {image_name} ({image.shape}) with parameters: {params}")
 
             try:
                 if caching and cached_result:
