@@ -3,9 +3,10 @@ import time
 
 import torch
 
+
 from mia import plotting, prompts
-from vlm.clip import CLIPEvaluator
-from vlm.visual_bert import VisualBertEvaluator
+
+
 
 
 def check_set_gpu(override=None):
