@@ -7,6 +7,7 @@ import requests
 from PIL import Image
 from rasterio import RasterioIOError
 
+from cellpose import io
 
 def pil_loader(image_path):
     """
@@ -28,6 +29,18 @@ def pil_loader(image_path):
     # Ensure the image is in RGB format (fixes issues with incorrect color channels)
     return image.convert("RGB")
 
+
+def get_cellpose_ground_truth(image_path, image_name, type="Nuclei"):
+
+    ground_truth_path = image_path.replace("images_cropped_isotropic", f"labelmaps/{type}")
+    ground_truth_path = ground_truth_path.replace(".tif", f"_{type.lower()}-labels.tif")
+
+    if os.path.exists(ground_truth_path):
+        ground_truth = io.imread(ground_truth_path)
+    else:
+        print(f"Ground truth not found for {image_name}. Skipping.")
+        ground_truth = None
+    return ground_truth
 
 def opencv_loader(path):
     # Read the image using OpenCV
