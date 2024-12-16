@@ -19,10 +19,14 @@ def f1_score(ground_truth, masks):
 
 
 def simple_iou(ground_truth, masks):
-    intersection = np.logical_and(ground_truth > 0, masks > 0).sum()
-    union = np.logical_or(ground_truth > 0, masks > 0).sum()
-    simple_jaccard = intersection / union if union > 0 else 0
-    return simple_jaccard
+    try:
+        intersection = np.logical_and(ground_truth > 0, masks > 0).sum()
+        union = np.logical_or(ground_truth > 0, masks > 0).sum()
+        simple_jaccard = intersection / union if union > 0 else 0
+        return simple_jaccard
+    except Exception as e:
+        print(f"Error: {e}")
+        return -1
 
 def dice_coefficient(ground_truth, prediction):
     """Calculate Dice coefficient for a single mask."""
