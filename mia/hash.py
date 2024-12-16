@@ -5,10 +5,28 @@ import os
 import numpy as np
 
 
-def compute_hash(image, parameters):
+def filter_model_parameter(params):
+    model_keys = [
+        "model_name",
+        "channel_segment",
+        "channel_nuclei",
+        "channel_axis",
+        "diameter",
+        "do_3D",
+        "stitch_threshold",
+        "normalize",
+        "invert",
+        "tile_overlap",
+    ]
+    return {k: params.get(k, None) for k in model_keys}
+
+def compute_hash(image, parameters, compute_masks:bool = True):
     """
     Compute a unique hash for the image and parameters.
     """
+    if not compute_masks:
+        parameters = filter_model_parameter(parameters)
+
     image_hash = hashlib.sha256(image.tobytes()).hexdigest()
     param_hash = hashlib.sha256(json.dumps(parameters, sort_keys=True).encode()).hexdigest()
     return f"{image_hash}_{param_hash}"
