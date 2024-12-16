@@ -2,9 +2,7 @@ import glob
 import os
 
 import napari
-import pyclesperanto_prototype as cle
 from cellpose import models, io
-from matplotlib import pyplot as plt
 
 import wandb
 from mia.cellpose import evaluation_params, evaluate_model
@@ -15,23 +13,35 @@ from mia.results import ResultHandler
 from mia.utils import check_set_gpu, check_paths
 
 
-
-def optimize_parameters(image_dir, output_dir, cache_dir="cache"):
+def optimize_parameters(
+        image_dir: str = "",
+        output_dir: str = "",
+        cache_dir: str = "cache",
+        type:str = "Nuclei",  # "Nuclei" or "Membranes"
+        log_wandb: bool = False,
+):
 
     check_paths(image_dir, output_dir, cache_dir)
 
     # Do you want to show the viewer?
-    show_viewer = True
+    show_viewer = False
 
     # get available torch device (CPU, GPU or MPS)
     device = check_set_gpu()
 
     # Load the Cellpose model
+    model_args = {
+        "device": device,
+        "nchan": 2, # TODO check if this is correct = 1?
+        # "diam_mean": 30, # TODO how to change this?
+        "gpu": False,
+    }
+
     model_dict = {
-        "cyto": models.Cellpose(model_type='cyto', device=device),
-        "cyto2": models.Cellpose(model_type='cyto2', device=device),
-        "cyto3": models.Cellpose(model_type='cyto3', device=device),
-        "nuclei": models.Cellpose(model_type='nuclei', device=device),
+        "cyto": models.Cellpose(model_type='cyto', **model_args),
+        "cyto2": models.Cellpose(model_type='cyto2', **model_args),
+        "cyto3": models.Cellpose(model_type='cyto3', **model_args),
+        "nuclei": models.Cellpose(model_type='nuclei', **model_args),
     }
 
     # Get the list of images
@@ -41,8 +51,6 @@ def optimize_parameters(image_dir, output_dir, cache_dir="cache"):
     if os.path.exists(result_path):
         os.remove(result_path)
 
-
-    type = "Nuclei" # "Nuclei" or "Membranes"
     if type == "Nuclei":
         channel_idx = 0
     elif type == "Membranes":
@@ -77,24 +85,17 @@ def optimize_parameters(image_dir, output_dir, cache_dir="cache"):
             #     continue  # Skip if result already exists
 
             cache_key = compute_hash(image, params)
-            wandb.init(
-                project="organoid_segmentation",
-                name=cache_key,
-                config=params,
-            )
+            if log_wandb:
+                wandb.init(
+                    project="organoid_segmentation",
+                    name=cache_key,
+                    config=params,
+                )
 
             model = model_dict[params["model_name"]]
             print(f"Processing image {image_name} ({image.shape}) with parameters: {params}")
+
             masks, flows, styles, diams = evaluate_model(model, image, params, cache_dir)
-
-            #dP = flows[1][1]
-            #cellprob = flows[1][2]
-
-            #flow = flows[0]
-            #flow_v = flow[1][0]
-            #flow_h = flow[1][1]
-            #cellprob = flow[2]
-
 
             simple_jaccard = simple_iou(ground_truth, masks)
             # jaccard = jaccard_score(ground_truth, masks)
@@ -107,13 +108,17 @@ def optimize_parameters(image_dir, output_dir, cache_dir="cache"):
 
             print(f"Simple Jaccard: {simple_jaccard}")
 
+            # fig = plt.figure(figsize=(12, 5))
+            # plot.show_segmentation(fig, image, masks, flows, channels=[0, 0])
+
             # Log to W&B
-            wandb.log({
-                **params,
-                "simple_jaccard": simple_jaccard,
-                "image_name": image_name,
-                "image_idx": image_idx,
-            })
+            if log_wandb:
+                wandb.log({
+                    **params,
+                    "simple_jaccard": simple_jaccard,
+                    "image_name": image_name,
+                    "image_idx": image_idx,
+                })
 
             result_handler.log_result(params, simple_jaccard, -1)
 
@@ -145,7 +150,9 @@ def optimize_parameters(image_dir, output_dir, cache_dir="cache"):
 
         if image_idx > 10:
             break
-    wandb.finish()
+
+    if log_wandb:
+        wandb.finish()
 
 
 
