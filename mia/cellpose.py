@@ -1,27 +1,29 @@
 import itertools
 
+from cellpose import transforms
+
 from mia.hash import save_to_cache, compute_hash, load_from_cache
 
-# MODEL EVALUATION PARAMETERS
-# x (list or array): List or array of images. Can be list of 2D/3D images, or array of 2D/3D images, or 4D image array.
-# batch_size (int, optional): Number of 224x224 patches to run simultaneously on the GPU. Can make smaller or bigger depending on GPU memory usage. Defaults to 8.
-# channels (list, optional): List of channels, either of length 2 or of length number of images by 2. First element of list is the channel to segment (0=grayscale, 1=red, 2=green, 3=blue). Second element of list is the optional nuclear channel (0=none, 1=red, 2=green, 3=blue). For instance, to segment grayscale images, input [0,0]. To segment images with cells in green and nuclei in blue, input [2,3]. To segment one grayscale image and one image with cells in green and nuclei in blue, input [[0,0], [2,3]]. Defaults to [0,0].
-# channel_axis (int, optional): If None, channels dimension is attempted to be automatically determined. Defaults to None.
-# invert (bool, optional): Invert image pixel intensity before running network (if True, image is also normalized). Defaults to False.
-# normalize (bool, optional): If True, normalize data so 0.0=1st percentile and 1.0=99th percentile of image intensities in each channel; can also pass dictionary of parameters (see CellposeModel for details). Defaults to True.
-# diameter (float, optional): If set to None, then diameter is automatically estimated if size model is loaded. Defaults to 30..
-# do_3D (bool, optional): Set to True to run 3D segmentation on 4D image input. Defaults to False.
-
-channel_segment_list = [0, 1, 2, 3]
-channel_nuclei_list = [0]
+cellprob_threshold_list = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5]
 channel_axis_list = [0] # TODO
-invert_list = [False, True]
-normalize_list = [False, True] # TODO iterate over normalization parameters
+channel_nuclei_list = [0]
+channel_segment_list = [0, 1, 2, 3]
 diameter_list = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100] # TODO good values (btw. None not working for 3D)
-do_3D_list = [True] # TODO try False too
+do_3D_list = [True, False] # TODO try False too
+flow_threshold_list = [0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
+interp_list = [False] # NOT AVAILABLE FOR 3D
+invert_list = [False, True]
+max_size_fraction_list = [0.5] # TODO
+min_size_list = [15] # TODO
 model_list = ["cyto", "cyto2", "cyto3", "nuclei"]
+niter_list = [100] # TODO
+normalize_list = [False, True] # TODO iterate over normalization parameters
+stitch_threshold_list = [0.0] # TODO
+tile_overlap_list = [0.1] # TODO
 
-
+# nchan (int, optional): Number of channels to use as input to network, default is 2 (cyto + nuclei) or (nuclei + zeros). TODO
+# backbone_list # TODO
+# anisotropic_list # TODO
 
 # getting dict of all possible parameters
 evaluation_params = [
@@ -33,16 +35,41 @@ evaluation_params = [
         "invert": inv,
         "normalize": norm,
         "diameter": dia,
-        "do_3D": d3
+        "do_3D": d3,
+        "flow_threshold": ft,
+        "cellprob_threshold": ct,
+        "interp": interp,
+        "min_size": ms,
+        "max_size_fraction": msf,
+        "niter": niter,
+        "stitch_threshold": st,
+        "tile_overlap": to,
     }
-    for m, cs, cn, ca, inv, norm, dia, d3 in itertools.product(
-        model_list, channel_segment_list, channel_nuclei_list, channel_axis_list, invert_list, normalize_list, diameter_list, do_3D_list
+    for m, cs, cn, ca, inv, norm, dia, d3, ft, ct, interp, ms, msf, niter, st, to in itertools.product(
+        model_list,
+        channel_segment_list,
+        channel_nuclei_list,
+        channel_axis_list,
+        invert_list,
+        normalize_list,
+        diameter_list,
+        do_3D_list,
+        flow_threshold_list,
+        cellprob_threshold_list,
+        interp_list,
+        min_size_list,
+        max_size_fraction_list,
+        niter_list,
+        stitch_threshold_list,
+        tile_overlap_list,
     )
 ]
 
 
-def evaluate_model(model, image, params, cache_dir):
-    cache_key = compute_hash(image, params)
+def evaluate_model(model, image, params, cache_dir, compute_masks=True):
+
+    cache_key = compute_hash(image, params, compute_masks)
+
     cached_result = load_from_cache(cache_dir, cache_key)
     model_name = params["model_name"]
 
@@ -52,15 +79,21 @@ def evaluate_model(model, image, params, cache_dir):
     else:
         print(f"No cache found. Running eval for {model_name}.")
         try:
+
             masks, flows, styles, diams = model.eval(
                 image,
-                channels=[params["channel_segment"], params["channel_nuclei"]],
+                cellprob_threshold=params["cellprob_threshold"],
                 channel_axis=params["channel_axis"],
-                invert=params["invert"],
-                normalize=params["normalize"],
+                channels=[params["channel_segment"], params["channel_nuclei"]],
+                compute_masks=compute_masks,
                 diameter=params["diameter"],
                 do_3D=params["do_3D"],
-                z_axis=0,  # TODO: z-axis parameter
+                flow_threshold=params["flow_threshold"],
+                invert=params["invert"],
+                max_size_fraction=0.5, # default
+                min_size=15, # default
+                normalize=params["normalize"],
+                z_axis=0,  # TODO: z-axis parameter always 0?
             )
             save_to_cache(cache_dir, cache_key, masks, flows, styles, diams)
 
@@ -71,6 +104,31 @@ def evaluate_model(model, image, params, cache_dir):
             styles = None
             diams = None
 
-        save_to_cache(cache_dir, cache_key, masks, flows, styles, diams)
+    if not compute_masks:
+        # dP_colors = flows[0]
+        dP = flows[1]
+        cellprob = flows[2]
+        nchan = 2  # TODO
+        x = transforms.convert_image(
+            image,
+            [params["channel_segment"], params["channel_nuclei"]],
+            channel_axis=params["channel_axis"],
+            z_axis=0,
+            do_3D=(params["do_3D"] or params["stitch_threshold"] > 0),
+            nchan=nchan)
+
+        masks = model.cp._compute_masks(
+            x.shape, dP, cellprob,
+            flow_threshold=params["flow_threshold"],
+            cellprob_threshold=params["cellprob_threshold"],
+            interp=params["interp"],
+            min_size=params["min_size"],
+            max_size_fraction=params["max_size_fraction"],
+            niter=params["niter"],
+            stitch_threshold=params["stitch_threshold"],
+            do_3D=params["do_3D"],
+        )
+
+        masks = masks.squeeze()
 
     return masks, flows, styles, diams
