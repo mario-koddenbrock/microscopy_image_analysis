@@ -1,156 +1,17 @@
-import datetime
 import glob
 import os
 
-import cellpose
 import napari
 import numpy as np
-import wandb
 from cellpose import models, io
-from cellpose.metrics import aggregated_jaccard_index, average_precision
-from napari_animation import Animation
 
-from mia.cellpose import evaluation_params
-from mia.hash import compute_hash, load_from_cache, save_to_cache
-from mia.results import ResultHandler
-from mia.utils import check_set_gpu, check_paths
-
-# Set the path to the ffmpeg executable - only needed for exporting animations
-os.environ["IMAGEIO_FFMPEG_EXE"] = "/opt/homebrew/bin/ffmpeg"
-print(f"Cellpose version: {cellpose.version}")
+from mia.cellpose import evaluate_model
+from mia.file_io import get_cellpose_ground_truth
+from mia.utils import check_paths
+from mia.viz import extract_cellpose_video
 
 
-def optimize_parameters(image_dir, output_dir, cache_dir="cache"):
-
-    check_paths(image_dir, output_dir, cache_dir)
-
-    # Do you want to show the viewer?
-    show_viewer = False
-    caching = False
-
-    image_folder_name = os.path.basename(image_dir.replace("/images", ""))
-    run_name = f"{image_folder_name}_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
-    wandb.init(
-        project="organoid_segmentation",
-        name=run_name,
-    )
-
-    # get available torch device (CPU, GPU or MPS)
-    device = check_set_gpu()
-
-    # Load the Cellpose model
-    model_dict = {
-        "cyto": models.Cellpose(model_type='cyto', device=device),
-        "cyto2": models.Cellpose(model_type='cyto2', device=device),
-        "cyto3": models.Cellpose(model_type='cyto3', device=device),
-        "nuclei": models.Cellpose(model_type='nuclei', device=device),
-    }
-
-    # Get the list of images
-    image_paths = glob.glob(os.path.join(image_dir, "*.tif"))
-
-    result_path = os.path.join(output_dir, "results.csv")
-    if os.path.exists(result_path):
-        os.remove(result_path)
-
-    result_handler = ResultHandler(result_path)
-
-    # Loop over the images
-    for image_idx, image_path in enumerate(image_paths[1:]):
-
-        image_name = os.path.basename(image_path).replace(".tif", "")
-        ground_truth_path = image_path.replace("images", "Manual_meshes").replace(".tif", "-labels.tif")
-
-        if os.path.exists(ground_truth_path):
-            ground_truth = io.imread(ground_truth_path)
-        else:
-            print(f"Ground truth not found for {image_name}. Skipping.")
-            continue
-
-        # Read image with cellpose.io
-        image = io.imread(image_path)
-
-        for params in evaluation_params:
-
-            if result_handler.is_result_present(params):
-                continue  # Skip if result already exists
-
-            cache_key = compute_hash(image, params)
-            cached_result = load_from_cache(cache_dir, cache_key)
-
-            print(f"Processing image {image_name} ({image.shape}) with parameters: {params}")
-
-            try:
-                if caching and cached_result:
-                    print(f"Loaded cached result...")
-                    masks, flows, styles, diams = cached_result
-                else:
-                    print(f"No cache found...")
-                    model = model_dict[params["model_name"]]
-                    masks, flows, styles, diams = model.eval(
-                        image,
-                        channels=[params["channel_segment"], params["channel_nuclei"]],
-                        channel_axis=params["channel_axis"],
-                        invert=params["invert"],
-                        normalize=params["normalize"],
-                        diameter=params["diameter"],
-                        do_3D=params["do_3D"],
-                        z_axis=0, # TODO: z-axis parameter
-                    )
-                    save_to_cache(cache_dir, cache_key, masks, flows, styles, diams)
-
-                simple_jaccard = simple_iou(ground_truth, masks)
-                # jaccard = jaccard_score(ground_truth, masks)
-                # fscore = f1_score(ground_truth, masks)
-                # precision, recall, fscore = boundary_scores(ground_truth, masks)
-
-            except Exception as e:
-                print(f"Error: {e}")
-                continue
-
-            # Log to W&B
-            wandb.log({
-                **params,
-                "simple_jaccard": simple_jaccard,
-                "image_name": image_name,
-                "image_idx": image_idx,
-            })
-
-            result_handler.log_result(params, simple_jaccard, -1)
-
-            if show_viewer:
-                # Initialize the Napari viewer
-                viewer = napari.Viewer()
-
-                # Add the image to the viewer
-                viewer.add_image(
-                    image,
-                    contrast_limits=[113, 1300],
-                    name='Organoids',
-                    colormap='gray',
-                )
-
-                # Add the labels to the viewer
-                viewer.add_labels(
-                    masks,
-                    name=params["model_name"],
-                    opacity=0.8,
-                    blending='translucent',
-                )
-
-                # setting the viewer to the center of the image
-                center = image.shape[0] // 2
-                viewer.dims.set_point(0, center)
-
-                napari.run()
-
-        if image_idx > 10:
-            break
-    wandb.finish()
-
-
-
-def view(image_dir, output_dir, cache_dir="cache"):
+def view(image_dir, output_dir, cache_dir="cache", show_gt=True, show_prediction=False, video_3d = True):
 
     check_paths(image_dir, output_dir, cache_dir)
 
@@ -159,19 +20,16 @@ def view(image_dir, output_dir, cache_dir="cache"):
     show_viewer = True
     export_video = False
 
-    # List of channels, either of length 2 or of length number of images by 2.
-    # First element of list is the channel to segment (0=grayscale, 1=red, 2=green, 3=blue).
-    # Second element of list is the optional nuclear channel (0=none, 1=red, 2=green, 3=blue).
-    # For instance, to segment grayscale images, input [0,0].
-    # To segment images with cells in green and nuclei in blue, input [2,3].
-    # To segment one grayscale image and one image with cells in green and nuclei in blue, input [[0,0], [2,3]].
-    # Defaults to [0,0].
-    channels = [0, 0]
+    type = "Nuclei" # "Nuclei" or "Membranes"
+    if type == "Nuclei":
+        channel_idx = 0
+    elif type == "Membranes":
+        channel_idx = 1
 
     # Load the Cellpose model
     model_dict = {
-        "cyto": models.Cellpose(model_type='cyto', gpu=False),
-        "cyto2": models.Cellpose(model_type='cyto2', gpu=False),
+        # "cyto": models.Cellpose(model_type='cyto', gpu=False),
+        # "cyto2": models.Cellpose(model_type='cyto2', gpu=False),
         "cyto3": models.Cellpose(model_type='cyto3', gpu=False),
         "nuclei": models.Cellpose(model_type='nuclei', gpu=False),
     }
@@ -187,21 +45,21 @@ def view(image_dir, output_dir, cache_dir="cache"):
         # Read image with cellpose.io
         image = io.imread(image_path)
 
-        ground_truth_path = image_path.replace("images", "Manual_meshes").replace(".tif", "-labels.tif")
-
-        if os.path.exists(ground_truth_path):
-            ground_truth = io.imread(ground_truth_path)
-        else:
-            print(f"Ground truth not found for {image_name}. Skipping.")
-            ground_truth = None
+        ground_truth = get_cellpose_ground_truth(image_path, image_name, type)
 
         # # TODO: contrast normalization on image
         # image = rescale_intensity(image)
+
+        if image.ndim == 4:
+            image = image[:, channel_idx, :, :]
 
         print(f"image: {image_name}")
         print(f"shape: {image.shape}")
         print(f"dtype: {image.dtype}")
         print(f"range: ({np.min(image)}, {np.max(image)})")
+
+        # plot the intensety distribution of the image
+        # plot_intensety(image)
 
         # iterate over all cellpose models
         for model_name, model in model_dict.items():
@@ -213,86 +71,78 @@ def view(image_dir, output_dir, cache_dir="cache"):
                 'channel_nuclei': 0,
                 'channel_axis': None,
                 'invert': False,
-                'normalize': False,
+                'normalize': True,
                 'diameter': None,
                 'do_3D': True,
             }
 
-            cache_key = compute_hash(image, params)
-            cached_result = load_from_cache(cache_dir, cache_key)
-
-            if cached_result:
-                print(f"Loaded cached result for {model_name}.")
-                masks, flows, styles, diams = cached_result
-            else:
-                print(f"No cache found. Running eval for {model_name}.")
-                masks, flows, styles, diams = model.eval(
-                    image,
-                    channels=[params["channel_segment"], params["channel_nuclei"]],
-                    channel_axis=params["channel_axis"],
-                    invert=params["invert"],
-                    normalize=params["normalize"],
-                    diameter=params["diameter"],
-                    do_3D=params["do_3D"],
-                    z_axis=0,  # TODO: z-axis parameter
-                )
-                save_to_cache(cache_dir, cache_key, masks, flows, styles, diams)
+            print(f"Processing image {image_name} ({image.shape}) with parameters: {params}")
+            if show_prediction:
+                masks, flows, styles, diams = evaluate_model(model, image, params, cache_dir)
 
             # Initialize the Napari viewer
             viewer = napari.Viewer()
 
-            if ground_truth is None:
-                # Add the image to the viewer
-                viewer.add_image(
-                    image,
-                    contrast_limits=[113, 1300],
-                    name='Organoids',
-                    colormap='gray',
-                )
+            # get the interquartile range of the intensities
+            q1, q3 = np.percentile(image, [5, 98])
 
-
-            if ground_truth is not None:
-                simple_jaccard = simple_iou(ground_truth, masks)
-                jaccard = jaccard_score(ground_truth, masks)
-                fscore = f1_score(ground_truth, masks)
-                # precision, recall, fscore = boundary_scores(ground_truth, masks)
-
-                print(f"Simple Jaccard: {simple_jaccard}")
-                print(f"Jaccard: {jaccard}")
-                print(f"F1-Score: {fscore}")
-                # print(f"Boundaries: {boundaries}")
-
-                viewer.add_image(
-                    ground_truth,
-                    name="Ground truth",
-                    # opacity=0.8,
-                    # blending='translucent',
-                    # colormap=matplotlib.cm.get_cmap('Set1'),
-                )
-
-            # Add the labels to the viewer
-            viewer.add_labels(
-                masks,
-                name=model_name,
-                opacity=0.8,
-                blending='translucent',
-                # colormap=matplotlib.cm.get_cmap('Set1'),
+            # Add the image to the viewer
+            viewer.add_image(
+                image,
+                contrast_limits=[q1, q3],
+                name='Organoids',
+                colormap='gray',
             )
 
+            if show_gt and (ground_truth is not None):
+            #     simple_jaccard = simple_iou(ground_truth, masks)
+            #     jaccard = jaccard_score(ground_truth, masks)
+            #     fscore = f1_score(ground_truth, masks)
+            #     # precision, recall, fscore = boundary_scores(ground_truth, masks)
+            #
+            #     print(f"Simple Jaccard: {simple_jaccard}")
+            #     print(f"Jaccard: {jaccard}")
+            #     print(f"F1-Score: {fscore}")
+            #     # print(f"Boundaries: {boundaries}")
+
+                layer = viewer.add_labels(
+                    ground_truth,
+                    name="Ground truth",
+                    opacity=0.7,
+                    blending='translucent',
+                    # colormap='magma',
+                )
+                layer.contour = 2
+
+            if show_prediction:
+                # Add the labels to the viewer
+                layer = viewer.add_labels(
+                    masks,
+                    name=params["model_name"],
+                    opacity=0.7,
+                    blending='translucent',
+                    # colormap='magma',
+                )
+                layer.contour = 2
+
             if export_video:
-                # Create an animation object
-                animation = Animation(viewer)
-
-                # Loop over z-slices and capture frames
-                for z in range(image.shape[0]):
-                    viewer.dims.set_point(0, z)
-                    animation.capture_keyframe()
-
                 # Save the animation
-                video_filename = f"{image_name}_{model_name}_animation.mp4"
-                video_path = os.path.join(output_dir, video_filename)
-                animation.animate(video_path, canvas_only=False)
-                print(f"Saved animation to {video_path}")
+                video_filename = f"{image_name}_{type}.mp4"
+
+
+                if show_prediction:
+                    model_name = params["model_name"]
+                    video_filename = video_filename.replace(".mp4", f"_{model_name}.mp4")
+
+                if show_gt:
+                    video_filename = video_filename.replace(".mp4", "_GT.mp4")
+
+                if video_3d:
+                    video_filename = video_filename.replace(".mp4", "_3D.mp4")
+
+                mode = "3D" if video_3d else "2D"
+                num_z_slices = image.shape[0]
+                extract_cellpose_video(viewer, output_dir, video_filename, num_z_slices, mode=mode)
 
                 # Close the viewer to release resources
                 viewer.close()
@@ -304,40 +154,36 @@ def view(image_dir, output_dir, cache_dir="cache"):
 
                 napari.run()
 
-        if image_idx > 10:
-            break
+        # if image_idx > 10:
+        #     break
 
 
-def jaccard_score(ground_truth, masks):
-    aji_scores = aggregated_jaccard_index(ground_truth, masks)
-    return np.mean(aji_scores)
-
-
-def f1_score(ground_truth, masks):
-    ap, tp, fp, fn = average_precision(ground_truth, masks)
-    precision = np.sum(tp) / np.sum(tp + fp)
-    recall = np.sum(tp) / np.sum(tp + fn)
-    if precision + recall == 0:
-        fscore = 0
-    else:
-        fscore = 2 * (precision * recall) / (precision + recall)
-    return fscore
-
-
-def simple_iou(ground_truth, masks):
-    intersection = np.logical_and(ground_truth > 0, masks > 0).sum()
-    union = np.logical_or(ground_truth > 0, masks > 0).sum()
-    simple_jaccard = intersection / union if union > 0 else 0
-    return simple_jaccard
 
 
 if __name__ == "__main__":
 
-    # directory containing the images
-    image_dir = "Datasets/Organoids/20230712_P013T_cropped_isotropic/images"
+    main_folder = "Datasets/P013T/"
 
-    # directory to save the output
-    output_dir = "Segmentation/Organoids/20230712_P013T_cropped_isotropic"
+    # get all the subfolder
+    subfolders = glob.glob(os.path.join(main_folder, "*"))
 
-    # view(image_dir, output_dir)
-    optimize_parameters(image_dir, output_dir)
+    for folder in subfolders:
+
+        if not os.path.isdir(folder):
+            continue
+
+        # directory containing the images
+        image_dir = os.path.join(folder, "images_cropped_isotropic")
+
+        # directory to save the output
+        output_dir = image_dir.replace("Datasets", "Segmentation")
+
+        for video_3d in [True, False]:
+            for show_gt in [True, False]:
+                for show_prediction in [True, False]:
+                    print(f"video_3d: {video_3d}, show_gt: {show_gt}, show_prediction: {show_prediction}")
+                    try:
+                        view(image_dir, output_dir, video_3d=video_3d, show_gt=show_gt, show_prediction=show_prediction)
+                    except Exception as e:
+                        print(f"Error: {e}")
+                        continue
