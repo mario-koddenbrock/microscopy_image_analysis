@@ -20,6 +20,10 @@ def f1_score(ground_truth, masks):
 
 def simple_iou(ground_truth, masks):
     try:
+
+        if ground_truth is None or masks is None:
+            return -2
+
         intersection = np.logical_and(ground_truth > 0, masks > 0).sum()
         union = np.logical_or(ground_truth > 0, masks > 0).sum()
         simple_jaccard = intersection / union if union > 0 else 0
