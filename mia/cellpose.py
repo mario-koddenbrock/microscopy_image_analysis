@@ -4,22 +4,39 @@ from cellpose import transforms
 
 from mia.hash import save_to_cache, compute_hash, load_from_cache
 
-cellprob_threshold_list = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5]
-channel_axis_list = [0] # TODO
+
+# The dataset-specific models were trained on the training images from the following datasets:
+# tissuenet_cp3: tissuenet dataset.
+# livecell_cp3: livecell dataset
+# yeast_PhC_cp3: YEAZ dataset
+# yeast_BF_cp3: YEAZ dataset
+# bact_phase_cp3: omnipose dataset
+# bact_fluor_cp3: omnipose dataset
+# deepbacs_cp3: deepbacs dataset
+# cyto2_cp3: cellpose dataset
+
+# We have a nuclei model and a super-generalist cyto3 model.
+# There are also two older models, cyto, which is trained on only the Cellpose training set, and cyto2, which is also trained on user-submitted images.
+
+model_list = ["cyto3", "nuclei"] # ["cyto", "cyto2", "cyto3", "nuclei"]
+
+
+cellprob_threshold_list = [0.0, 0.1, 0.2] # [0.0, 0.1, 0.2, 0.3, 0.4, 0.5]
+channel_axis_list = [None] # TODO
 channel_nuclei_list = [0]
-channel_segment_list = [0, 1, 2, 3]
-diameter_list = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100] # TODO good values (btw. None not working for 3D)
-do_3D_list = [True, False] # TODO try False too
-flow_threshold_list = [0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
+channel_segment_list = [0] # [0, 1, 2, 3]
+diameter_list = [30, 50, 70] # TODO good values (btw. None not working for 3D)
+do_3D_list = [True] # TODO try False too
+flow_threshold_list = [0.3, 0.5] # [0.3, 0.4, 0.5, 0.6]
 interp_list = [False] # NOT AVAILABLE FOR 3D
-invert_list = [False, True]
+invert_list = [False] # [False, True]
 max_size_fraction_list = [0.5] # TODO
 min_size_list = [15] # TODO
-model_list = ["cyto", "cyto2", "cyto3", "nuclei"]
 niter_list = [100] # TODO
-normalize_list = [False, True] # TODO iterate over normalization parameters
+normalize_list = [True] # [False, True]
 stitch_threshold_list = [0.0] # TODO
 tile_overlap_list = [0.1] # TODO
+type_list = ["Nuclei", "Membranes"]  # "Nuclei" or "Membranes"
 
 # nchan (int, optional): Number of channels to use as input to network, default is 2 (cyto + nuclei) or (nuclei + zeros). TODO
 # backbone_list # TODO
@@ -44,8 +61,9 @@ evaluation_params = [
         "niter": niter,
         "stitch_threshold": st,
         "tile_overlap": to,
+        "type": t,
     }
-    for m, cs, cn, ca, inv, norm, dia, d3, ft, ct, interp, ms, msf, niter, st, to in itertools.product(
+    for m, cs, cn, ca, inv, norm, dia, d3, ft, ct, interp, ms, msf, niter, st, to, t in itertools.product(
         model_list,
         channel_segment_list,
         channel_nuclei_list,
@@ -62,8 +80,10 @@ evaluation_params = [
         niter_list,
         stitch_threshold_list,
         tile_overlap_list,
+        type_list,
     )
 ]
+
 
 
 def evaluate_model(model, image, params, cache_dir, compute_masks=True):
@@ -74,10 +94,10 @@ def evaluate_model(model, image, params, cache_dir, compute_masks=True):
     model_name = params["model_name"]
 
     if cached_result:
-        print(f"Loaded cached result for {model_name}.")
+        print(f"\tLOADING FROM CACHE: {model_name}")
         masks, flows, styles, diams = cached_result
     else:
-        print(f"No cache found. Running eval for {model_name}.")
+        print(f"\tEVALUATING: {model_name}")
         try:
 
             masks, flows, styles, diams = model.eval(
