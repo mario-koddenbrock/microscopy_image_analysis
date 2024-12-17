@@ -20,7 +20,7 @@ def view(image_dir, output_dir, cache_dir="cache", show_gt=True, show_prediction
     show_viewer = True
     export_video = False
 
-    type = "Nuclei" # "Nuclei" or "Membranes"
+    type = "Membranes" # "Nuclei" or "Membranes"
     if type == "Nuclei":
         channel_idx = 0
     elif type == "Membranes":
@@ -38,7 +38,7 @@ def view(image_dir, output_dir, cache_dir="cache", show_gt=True, show_prediction
     image_paths = glob.glob(os.path.join(image_dir, "*.tif"))
 
     # Loop over the images
-    for image_idx, image_path in enumerate(image_paths[1:]):
+    for image_idx, image_path in enumerate(image_paths):
 
         image_name = os.path.basename(image_path).replace(".tif", "")
 
@@ -58,8 +58,8 @@ def view(image_dir, output_dir, cache_dir="cache", show_gt=True, show_prediction
         print(f"dtype: {image.dtype}")
         print(f"range: ({np.min(image)}, {np.max(image)})")
 
-        # plot the intensety distribution of the image
-        # plot_intensety(image)
+        # plot the intensity distribution of the image
+        # plot_intensity(image)
 
         # iterate over all cellpose models
         for model_name, model in model_dict.items():
@@ -84,7 +84,7 @@ def view(image_dir, output_dir, cache_dir="cache", show_gt=True, show_prediction
             viewer = napari.Viewer()
 
             # get the interquartile range of the intensities
-            q1, q3 = np.percentile(image, [5, 98])
+            q1, q3 = np.percentile(image, [5, 99])
 
             # Add the image to the viewer
             viewer.add_image(
