@@ -1,6 +1,7 @@
 import os
 
 import cv2
+import napari
 import numpy as np
 from matplotlib import pyplot as plt
 from napari_animation import Animation
@@ -62,8 +63,37 @@ def extract_cellpose_video(viewer, output_dir, video_filename, num_z_slices, mod
     animation.animate(video_path, canvas_only=True, fps=fps, quality=9)
     print(f"Saved animation to {video_path}")
 
+def show_napari(image, ground_truth, masks, params):
+    # Initialize the Napari viewer
+    viewer = napari.Viewer()
+    # Add the image to the viewer
+    viewer.add_image(
+        image,
+        contrast_limits=[113, 1300],
+        name='Organoids',
+        colormap='gray',
+    )
+    # Add the labels to the viewer
+    viewer.add_labels(
+        masks,
+        name=params["model_name"],
+        opacity=0.8,
+        blending='translucent',
+    )
+    if ground_truth is not None:
+        viewer.add_labels(
+            ground_truth,
+            name='Ground Truth',
+            opacity=0.8,
+            blending='translucent',
+        )
+    # setting the viewer to the center of the image
+    center = image.shape[0] // 2
+    viewer.dims.set_point(0, center)
+    napari.run()
 
-def plot_intensety(image):
+
+def plot_intensity(image):
     plt.hist(image.flatten(), bins=1000)
     # make log scale
     plt.yscale('log')
