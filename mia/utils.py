@@ -36,12 +36,6 @@ def check_paths(image_dir, output_dir, cache_dir):
     if not os.path.exists(cache_dir):
         os.makedirs(cache_dir)
 
-    result_path = os.path.join(output_dir, "results.csv")
-
-    if os.path.exists(result_path):
-        os.remove(result_path)
-
-    return result_path
 
 
 def initialize_evaluators(device, config):
