@@ -1,6 +1,7 @@
 import hashlib
 import json
 import os
+from dataclasses import asdict
 
 import numpy as np
 
@@ -25,10 +26,11 @@ def compute_hash(image, parameters, compute_masks:bool = True):
     Compute a unique hash for the image and parameters.
     """
     if not compute_masks:
+        # TODO adapt to new parameter object
         parameters = filter_model_parameter(parameters)
 
     image_hash = hashlib.sha256(image.tobytes()).hexdigest()
-    param_hash = hashlib.sha256(json.dumps(parameters, sort_keys=True).encode()).hexdigest()
+    param_hash = hashlib.sha256(json.dumps(asdict(parameters), sort_keys=True).encode()).hexdigest()
     return f"{image_hash}_{param_hash}"
 
 

@@ -118,7 +118,7 @@ def view(image_dir, output_dir, cache_dir="cache", show_gt=True, show_prediction
                 # Add the labels to the viewer
                 layer = viewer.add_labels(
                     masks,
-                    name=params["model_name"],
+                    name=params.model_name,
                     opacity=0.7,
                     blending='translucent',
                     # colormap='magma',
@@ -131,7 +131,7 @@ def view(image_dir, output_dir, cache_dir="cache", show_gt=True, show_prediction
 
 
                 if show_prediction:
-                    model_name = params["model_name"]
+                    model_name = params.model_name
                     video_filename = video_filename.replace(".mp4", f"_{model_name}.mp4")
 
                 if show_gt:

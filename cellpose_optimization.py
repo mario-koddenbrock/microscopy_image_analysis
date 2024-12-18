@@ -1,11 +1,13 @@
 import glob
 import os
+import time
 
 import napari
 
 from cellpose import io
 from cellpose.metrics import boundary_scores, mask_ious
 from cellpose.models import Cellpose
+from pyarrow import duration
 from segmentation_models_pytorch.utils.functional import jaccard
 from skimage.metrics import adapted_rand_error
 from tqdm import tqdm
@@ -28,16 +30,18 @@ from mia.viz import plot_intensity, show_napari
 def optimize_parameters(
         image_dir: str = "",
         output_dir: str = "",
+        result_file: str = "",
         cache_dir: str = "cache",
-        type:str = "Nuclei",  # "Nuclei" or "Membranes"
         log_wandb: bool = False,
         show_viewer: bool = False,
 ):
 
     device = check_set_gpu() # get available torch device (CPU, GPU or MPS)
-    result_path = check_paths(image_dir, output_dir, cache_dir)
+    check_paths(image_dir, output_dir, cache_dir)
     image_paths = glob.glob(os.path.join(image_dir, "*.tif")) # Get the list of images
-    result_handler = ResultHandler(result_path)
+
+
+    result_handler = ResultHandler(result_file)
 
     # Loop over the images
     for image_idx, image_path in enumerate(image_paths):
@@ -48,10 +52,14 @@ def optimize_parameters(
         image_orig = io.imread(image_path)
         ground_truth = get_cellpose_ground_truth(image_path, image_name)
 
+        if ground_truth is None:
+            print(f"Error: No ground truth found for {image_name}")
+            continue
 
         for param_idx, params in enumerate(evaluation_params):
 
-            type = params["type"]
+            t0 = time.time()
+            type = params.type
             if type == "Nuclei":
                 channel_idx = 0
             elif type == "Membranes":
@@ -78,7 +86,7 @@ def optimize_parameters(
 
             # Load the Cellpose model
             model = Cellpose(
-                model_type = params["model_name"],
+                model_type = params.model_name,
                 device = device,
                 nchan = 2,  # TODO check if this is correct = 1?
                 # diam_mean = 30, # TODO how to change this?
@@ -92,6 +100,7 @@ def optimize_parameters(
 
             masks, flows, styles, diams = evaluate_model(model, image, params, cache_dir)
 
+            duration = time.time() - t0
             if masks is None:
                 print(f"Error: No masks found for {image_name} with parameters: {params}")
                 continue
@@ -117,6 +126,7 @@ def optimize_parameters(
             if log_wandb:
                 wandb.log({
                     **params,
+                    "duration": duration,
                     "adapted_rand_error": are,
                     "precision": precision,
                     "recall": recall,
@@ -126,7 +136,7 @@ def optimize_parameters(
                 })
                 wandb.finish()
 
-            result_handler.log_result(params, are, precision, recall, f1)
+            result_handler.log_result(image_name, params, duration, are, precision, recall, f1)
 
             if show_viewer:
                 show_napari(image, ground_truth, masks, params)
@@ -139,8 +149,9 @@ if __name__ == "__main__":
 
     # get all the subfolder
     subfolders = glob.glob(os.path.join(main_folder, "*"))
+    result_file = os.path.join(main_folder, "results.csv")
 
-    for folder in subfolders[1:]:
+    for folder in subfolders:
 
         if not os.path.isdir(folder):
             continue
@@ -151,4 +162,4 @@ if __name__ == "__main__":
         # directory to save the output
         output_dir = image_dir.replace("Datasets", "Segmentation")
 
-        optimize_parameters(image_dir, output_dir)
+        optimize_parameters(image_dir, output_dir, result_file)
