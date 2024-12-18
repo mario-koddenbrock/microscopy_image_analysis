@@ -1,3 +1,4 @@
+import argparse
 import glob
 import os
 
@@ -117,33 +118,57 @@ def view(
         napari.run()
 
 
-
-
-
 if __name__ == "__main__":
 
-    main_folder = "Datasets/P013T/"
+    # python run_cellpose.py path/to/image.tif path/to/params.yaml path/to/output --show_gt --show_prediction --show_viewer
 
-    # get all the subfolder
-    subfolders = glob.glob(os.path.join(main_folder, "*"))
+    parser = argparse.ArgumentParser(description="View cellpose results with Napari.")
+    parser.add_argument("image_path", type=str, help="Path to the image file.")
+    parser.add_argument("param_file", type=str, help="Path to the parameter YAML file.")
+    parser.add_argument("output_dir", type=str, help="Directory to save the output.")
+    parser.add_argument("--cache_dir", type=str, default="cache", help="Directory for cache files.")
+    parser.add_argument("--show_gt", action="store_true", help="Show ground truth labels.")
+    parser.add_argument("--show_prediction", action="store_true", help="Show prediction labels.")
+    parser.add_argument("--video_3d", action="store_true", help="Export 3D video.")
+    parser.add_argument("--show_viewer", action="store_true", help="Show Napari viewer.")
+    parser.add_argument("--export_video", action="store_true", help="Export video.")
 
-    for folder in subfolders:
+    args = parser.parse_args()
 
-        if not os.path.isdir(folder):
-            continue
+    view(
+        image_path=args.image_path,
+        param_file=args.param_file,
+        output_dir=args.output_dir,
+        cache_dir=args.cache_dir,
+        show_gt=args.show_gt,
+        show_prediction=args.show_prediction,
+        video_3d=args.video_3d,
+        show_viewer=args.show_viewer,
+        export_video=args.export_video,
+    )
 
-        # directory containing the images
-        image_dir = os.path.join(folder, "images_cropped_isotropic")
-
-        # directory to save the output
-        output_dir = image_dir.replace("Datasets", "Segmentation")
-
-        # Get the list of images
-        image_paths = glob.glob(os.path.join(image_dir, "*.tif"))
-
-        # Loop over the images
-        for image_idx, image_path in enumerate(image_paths):
-
-            image_name = os.path.basename(image_path).replace(".tif", "")
-            param_file = os.path.join(folder, f"{image_name}.yaml")
-            view(image_dir, output_dir, video_3d=False, show_gt=True, show_prediction=True, show_viewer=True, export_video=False)
+    # main_folder = "Datasets/P013T/"
+    #
+    # # get all the subfolder
+    # subfolders = glob.glob(os.path.join(main_folder, "*"))
+    #
+    # for folder in subfolders:
+    #
+    #     if not os.path.isdir(folder):
+    #         continue
+    #
+    #     # directory containing the images
+    #     image_dir = os.path.join(folder, "images_cropped_isotropic")
+    #
+    #     # directory to save the output
+    #     output_dir = image_dir.replace("Datasets", "Segmentation")
+    #
+    #     # Get the list of images
+    #     image_paths = glob.glob(os.path.join(image_dir, "*.tif"))
+    #
+    #     # Loop over the images
+    #     for image_idx, image_path in enumerate(image_paths):
+    #
+    #         image_name = os.path.basename(image_path).replace(".tif", "")
+    #         param_file = os.path.join(folder, f"{image_name}.yaml")
+    #         view(image_dir, output_dir, video_3d=False, show_gt=True, show_prediction=True, show_viewer=True, export_video=False)
