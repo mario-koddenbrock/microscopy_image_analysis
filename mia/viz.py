@@ -3,6 +3,7 @@ import os
 import cv2
 import napari
 import numpy as np
+import pandas as pd
 from matplotlib import pyplot as plt
 from napari_animation import Animation
 from tqdm import tqdm
@@ -76,7 +77,7 @@ def show_napari(image, ground_truth, masks, params):
     # Add the labels to the viewer
     viewer.add_labels(
         masks,
-        name=params["model_name"],
+        name=params.model_name,
         opacity=0.8,
         blending='translucent',
     )
@@ -160,3 +161,103 @@ def save_as_video(output_video_path, image_with_labels, labels, regions):
     for frame_file in frame_files:
         os.remove(frame_file)
     print(f"Video saved at {output_video_path}")
+
+
+
+def plot_aggregated_metric_variation(file_path, metric='f1', boxplot=False):
+    """
+    Detect varying parameters and plot the aggregated metric over these parameters with uncertainty bands
+    aggregated over all image_name and type combinations. Optionally display a boxplot.
+
+    Parameters:
+        file_path (str): Path to the CSV file containing experiment results.
+        metric (str): The column name of the metric to evaluate (default is 'f1').
+        boxplot (bool): If True, display boxplots instead of error bars (default is False).
+    """
+    # Load data
+    df = pd.read_csv(file_path)
+
+    # Create output directory in the same folder as the input file
+    output_dir = os.path.dirname(file_path)
+
+    # Identify varying parameters (excluding fixed columns and specified metrics)
+    excluded_columns = ['image_name', 'type', metric, 'duration', 'are', 'precision', 'recall', 'f1']
+    varying_columns = [col for col in df.columns if df[col].nunique() > 1 and col not in excluded_columns]
+
+    if not varying_columns:
+        print("No varying parameters detected.")
+        return
+
+    print("Varying parameters detected:", varying_columns)
+
+    # Aggregate metric over all image_name and type
+    for param in varying_columns:
+        if boxplot:
+            # Create boxplot for the metric grouped by the parameter
+            # plt.figure(figsize=(8, 5))
+            df.boxplot(column=metric, by=param, grid=False)
+            plt.title(f"Boxplot of {metric} vs {param} (over all images)")
+            plt.suptitle("")  # Remove default title
+            plt.xlabel(param)
+            plt.ylabel(metric)
+            output_path = os.path.join(output_dir, f"boxplot_{param}_{metric}.png")
+
+        else:
+            # Plot mean and standard deviation as error bars
+            grouped = df.groupby(param)[metric].agg(['mean', 'std']).reset_index()
+            x = grouped[param]
+            y = grouped['mean']
+            yerr = grouped['std']
+
+            plt.figure(figsize=(8, 5))
+            plt.errorbar(x, y, yerr=yerr, fmt='-o', capsize=5, label=f"{metric} (mean ± std)")
+            plt.xlabel(param)
+            plt.ylabel(f"Aggregated {metric}")
+            plt.title(f"Aggregated {metric} vs {param} (over all images)")
+            plt.legend()
+            plt.grid(True)
+            output_path = os.path.join(output_dir, f"errorbar_{param}_{metric}.png")
+
+        plt.savefig(output_path)
+        plt.show()
+        # plt.close()
+        print(f"Saved plot to {output_path}")
+
+
+def plot_best_scores_barplot(file_path, metric='f1', output_file='best_scores_barplot.png'):
+    """
+    Visualize the best score for each image_name and type as a grouped bar plot.
+
+    Parameters:
+        file_path (str): Path to the CSV file containing experiment results.
+        metric (str): The column name of the metric to visualize (default is 'f1').
+        output_file (str): Path to save the bar plot (default is 'best_scores_barplot.png').
+    """
+    # Load data
+    df = pd.read_csv(file_path)
+
+    # Ensure the metric column exists
+    if metric not in df.columns:
+        print(f"Error: '{metric}' is not a valid column in the file.")
+        print("Available columns:", ', '.join(df.columns))
+        return
+
+    # Find the best configuration per image_name and type based on the metric
+    best_configs = df.loc[df.groupby(['image_name', 'type'])[metric].idxmax()]
+
+    # Prepare data for plotting
+    grouped = best_configs.groupby(['image_name', 'type'])[metric].max().unstack(fill_value=0)
+    grouped.plot(kind='bar', figsize=(12, 6), alpha=0.8, edgecolor='black')
+
+    # Plot customization
+    plt.title(f"Best {metric} Scores for Each Image and Type")
+    plt.xlabel("Image Name")
+    plt.ylabel(f"Best {metric} Score")
+    plt.xticks(rotation=45, ha='right')
+    plt.legend(title="Type", bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.tight_layout()
+
+    # Save the plot
+    plt.savefig(output_file)
+    plt.show()
+    print(f"Saved bar plot to {output_file}")
