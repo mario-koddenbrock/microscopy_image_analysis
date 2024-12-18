@@ -3,6 +3,7 @@ import os
 from collections import OrderedDict
 from dataclasses import asdict
 
+import yaml
 from prettytable import PrettyTable
 import pandas as pd
 import json
@@ -16,30 +17,26 @@ class ResultHandler:
         #     os.remove(result_path)
 
 
-    def log_result(self, image_name, evaluation_params, duration, are, precision, recall, f1):
+    def log_result(self, results, evaluation_params):
         """
         Log a new result to the CSV file.
 
         Args:
-            image_name (str): Name of the image.
+            results (dict): All results in one dict.
             evaluation_params (EvaluationParams): The parameters as a dataclass instance.
-            are (float): Average Relative Error.
-            precision (float): Precision metric.
-            recall (float): Recall metric.
-            f1 (float): F1 score.
         """
         # Convert dataclass to dictionary and add additional metrics
         properties = asdict(evaluation_params)
         properties.update({
-            "duration": duration,
-            "are": are,
-            "precision": precision,
-            "recall": recall,
-            "f1": f1
+            "duration": results["duration"],
+            "are": results["are"],
+            "precision": results["precision"],
+            "recall": results["recall"],
+            "f1": results["f1"],
         })
 
         # Ensure image_name is the first column
-        ordered_properties = OrderedDict([("image_name", image_name)])
+        ordered_properties = OrderedDict([("image_name", results["image_name"])])
         ordered_properties.update(properties)
 
         # Ensure consistent fieldnames (in the same order as OrderedDict keys)
@@ -112,13 +109,20 @@ def print_best_config_per_image(file_path, metric='f1', output_file='best_config
     # Sort for better readability
     best_configs = best_configs.sort_values(by=['image_name', 'type'])
 
-    # Convert DataFrame to dictionary for saving as JSON
-    best_configs_dict = best_configs.to_dict(orient='records')
+    # Create output directory in the same folder as the input file
+    output_dir = os.path.dirname(file_path)
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
 
-    # Save the best configurations to a JSON file
-    with open(output_file, 'w') as f:
-        json.dump(best_configs_dict, f, indent=4)
-    print(f"Best configurations have been saved to '{output_file}'.")
+    # Save each configuration to a separate YAML file
+    excluded_columns = ['image_name', 'type', 'duration', 'are', 'precision', 'recall', 'f1']
+    for _, row in best_configs.iterrows():
+        config = {col: row[col] for col in best_configs.columns if col not in excluded_columns}
+        file_name = f"{row['image_name']}_{row['type']}_config.yaml"
+        file_path = os.path.join(output_dir, file_name)
+        with open(file_path, 'w') as yaml_file:
+            yaml.dump(config, yaml_file, default_flow_style=False)
+        print(f"Saved configuration to {file_path}")
 
     # Print results
     print(f"Best configurations based on '{metric}':\n")

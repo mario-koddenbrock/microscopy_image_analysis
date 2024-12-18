@@ -1,29 +1,17 @@
 import glob
 import os
-import time
-
-import napari
+import random
 
 from cellpose import io
-from cellpose.metrics import boundary_scores, mask_ious
-from cellpose.models import Cellpose
-from pyarrow import duration
-from segmentation_models_pytorch.utils.functional import jaccard
-from skimage.metrics import adapted_rand_error
-from tqdm import tqdm
 
-import wandb
 from mia.cellpose import evaluation_params, evaluate_model
 from mia.file_io import get_cellpose_ground_truth
-from mia.hash import compute_hash
-from mia.metrics import simple_iou, jaccard_score, f1_score
 from mia.results import ResultHandler
-from mia.utils import check_paths, check_set_gpu
-from mia.viz import plot_intensity, show_napari
+from mia.utils import check_paths
+from mia.viz import show_napari
 
 
 # TODO use CellposeModel instead of Cellpose class
-
 # setting PYTORCH_ENABLE_MPS_FALLBACK=1
 
 
@@ -32,114 +20,33 @@ def optimize_parameters(
         output_dir: str = "",
         result_file: str = "",
         cache_dir: str = "cache",
-        log_wandb: bool = False,
         show_viewer: bool = False,
+        num_parameters: int = 100,
 ):
 
-    device = check_set_gpu() # get available torch device (CPU, GPU or MPS)
     check_paths(image_dir, output_dir, cache_dir)
     image_paths = glob.glob(os.path.join(image_dir, "*.tif")) # Get the list of images
-
 
     result_handler = ResultHandler(result_file)
 
     # Loop over the images
     for image_idx, image_path in enumerate(image_paths):
 
-        image_name = os.path.basename(image_path).replace(".tif", "")
+        # Set the random seed based on the image index
+        random.seed(image_idx)
 
-        # Read image with cellpose.io
-        image_orig = io.imread(image_path)
-        ground_truth = get_cellpose_ground_truth(image_path, image_name)
+        # Sample a fixed number of parameter combinations
+        sampled_params = random.sample(evaluation_params, num_parameters)
+        for param_idx, params in enumerate(sampled_params):
 
-        if ground_truth is None:
-            print(f"Error: No ground truth found for {image_name}")
-            continue
+            results = evaluate_model(image_path, params, cache_dir)
 
-        for param_idx, params in enumerate(evaluation_params):
-
-            t0 = time.time()
-            type = params.type
-            if type == "Nuclei":
-                channel_idx = 0
-            elif type == "Membranes":
-                channel_idx = 1
-            else:
-                raise ValueError(f"Invalid type: {type}")
-
-            # Get the right channel
-            image = image_orig[:, channel_idx, :, :] if image_orig.ndim == 4 else image_orig
-
-            # # TODO: contrast normalization on image
-            # image = rescale_intensity(image)
-
-            # plot the intensity distribution of the image
-            # plot_intensity(image)
-
-            cache_key = compute_hash(image, params)
-            if log_wandb:
-                wandb.init(
-                    project="organoid_segmentation",
-                    name=cache_key,
-                    config=params,
-                )
-
-            # Load the Cellpose model
-            model = Cellpose(
-                model_type = params.model_name,
-                device = device,
-                nchan = 2,  # TODO check if this is correct = 1?
-                # diam_mean = 30, # TODO how to change this?
-                gpu = False,
-            )
-
-            print(f"{image_idx+1}/{len(image_paths)}: Processing image {image_name} {image.shape}")
-            print(f"\t{param_idx+1}/{len(evaluation_params)}: Parameter:")
-            # for k, v in params.items():
-            #     print(f"\t\t{k}: {v}")
-
-            masks, flows, styles, diams = evaluate_model(model, image, params, cache_dir)
-
-            duration = time.time() - t0
-            if masks is None:
-                print(f"Error: No masks found for {image_name} with parameters: {params}")
-                continue
-
-            else:
-                # jaccard = jaccard_score(ground_truth, masks)
-                # simple_jaccard = simple_iou(ground_truth, masks)
-                # iout, preds = mask_ious(ground_truth, masks)
-                # jaccard = jaccard_score(ground_truth, masks)
-                # fscore = f1_score(ground_truth, masks)
-
-                are, precision, recall = adapted_rand_error(ground_truth, masks)
-                f1 = 2 * (precision * recall) / (precision + recall) if precision + recall > 0 else 0
-                print(f"\tAdapted Rand Error: {are:.2f}")
-                print(f"\tPrecision: {precision:.2f}")
-                print(f"\tRecall: {recall:.2f}")
-                print(f"\tF1: {f1:.2f}")
-
-            # fig = plt.figure(figsize=(12, 5))
-            # plot.show_segmentation(fig, image, masks, flows, channels=[0, 0])
-
-            # Log to W&B
-            if log_wandb:
-                wandb.log({
-                    **params,
-                    "duration": duration,
-                    "adapted_rand_error": are,
-                    "precision": precision,
-                    "recall": recall,
-                    "f1": f1,
-                    "image_name": image_name,
-                    "image_idx": image_idx,
-                })
-                wandb.finish()
-
-            result_handler.log_result(image_name, params, duration, are, precision, recall, f1)
+            if results is not None:
+                result_handler.log_result(results, params)
 
             if show_viewer:
-                show_napari(image, ground_truth, masks, params)
+                show_napari(results, params)
+
 
 
 

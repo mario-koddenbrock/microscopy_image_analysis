@@ -6,8 +6,10 @@ import rasterio
 import requests
 from PIL import Image
 from rasterio import RasterioIOError
-
+from cachetools import cached, TTLCache
 from cellpose import io
+
+cache = TTLCache(maxsize=100, ttl=300)
 
 def pil_loader(image_path):
     """
@@ -28,6 +30,15 @@ def pil_loader(image_path):
 
     # Ensure the image is in RGB format (fixes issues with incorrect color channels)
     return image.convert("RGB")
+
+
+@cached(cache)
+def load_image_with_gt(image_path, type):
+    image_name = os.path.basename(image_path).replace(".tif", "")
+    # Read image with cellpose.io
+    image_orig = io.imread(image_path)
+    ground_truth = get_cellpose_ground_truth(image_path, image_name, type)
+    return ground_truth, image_name, image_orig
 
 
 def get_cellpose_ground_truth(image_path, image_name, type="Nuclei"):
