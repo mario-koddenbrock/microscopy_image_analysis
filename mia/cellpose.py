@@ -2,11 +2,12 @@ import itertools
 import os
 import time
 from dataclasses import dataclass
+from enum import Enum
 
 import wandb
 import yaml
 from cellpose import transforms
-from cellpose.models import Cellpose
+from cellpose.models import Cellpose, CellposeModel
 from skimage.metrics import adapted_rand_error
 
 from mia.file_io import load_image_with_gt
@@ -30,14 +31,16 @@ from mia.utils import check_set_gpu
 # backbone_list # TODO
 # anisotropic_list # TODO
 
+model_list = ["cyto", "cyto2", "cyto3", "nuclei", "tissuenet_cp3", "livecell_cp3", "yeast_PhC_cp3", "yeast_BF_cp3", "bact_phase_cp3", "bact_fluor_cp3", "deepbacs_cp3", "cyto2_cp3"]
+
 param_options = {
-    "model_name": ["cyto2", "cyto", "cyto3", "nuclei"], # ["cyto", "cyto2", "cyto3", "nuclei"]
-    "channel_segment": [0, 1, 2, 3], # [0, 1, 2, 3]
+    "model_name": model_list,
+    "channel_segment": [0], # [0, 1, 2, 3]
     "channel_nuclei": [0],
     "channel_axis": [None], # TODO
     "invert": [False, True], # [False, True]
     "normalize": [False, True], # [False, True]
-    "diameter": [10, 30, 50, 70, 100], # TODO good values (btw. None not working for 3D)
+    "diameter": [10, 17, 30, 50, 70, 100], # TODO good values (btw. None not working for 3D)
     "do_3D": [True], # TODO try False too
     "flow_threshold": [0.1, 0.3, 0.5, 0.7], # [0.3, 0.4, 0.5, 0.6]
     "cellprob_threshold": [0.0, 0.1, 0.2, 0.5], # [0.0, 0.1, 0.2, 0.3, 0.4, 0.5]
@@ -47,7 +50,7 @@ param_options = {
     "niter": [100], # TODO
     "stitch_threshold": [0.0], # TODO
     "tile_overlap": [0.1], # TODO
-    "type": ["Nuclei", "Membranes"],  # "Nuclei" or "Membranes"
+    "type": [""],  # just a placeholder for "Nuclei" or "Membranes"
 }
 
 # Define a dataclass to store the evaluation parameters
@@ -116,13 +119,15 @@ evaluation_params = [
 
 def evaluate_model(image_path, params, cache_dir="cache", compute_masks=True, log_wandb=False):
     t0 = time.time()
-    ground_truth, image_name, image_orig = load_image_with_gt(image_path, params.type)
-
-    if ground_truth is None:
-        return None
 
     image_name = os.path.basename(image_path).replace(".tif", "")
-    print(f"Processing {image_name}")
+    device = check_set_gpu()  # get available torch device (CPU, GPU or MPS)
+    ground_truth, image_orig = load_image_with_gt(image_path, params.type)
+
+    if ground_truth is None:
+        return EvaluationError.GROUND_TRUTH_NOT_AVAILABLE
+
+    print(f"Processing {image_name} ({device})")
 
     if params.type == "Nuclei":
         channel_idx = 0
@@ -141,14 +146,6 @@ def evaluate_model(image_path, params, cache_dir="cache", compute_masks=True, lo
     # plot the intensity distribution of the image
     # plot_intensity(image)
 
-    cache_key = compute_hash(image, params)
-    if log_wandb:
-        wandb.init(
-            project="organoid_segmentation",
-            name=cache_key,
-            config=params,
-        )
-
     cache_key = compute_hash(image, params, compute_masks)
 
     cached_result = load_from_cache(cache_dir, cache_key)
@@ -161,18 +158,26 @@ def evaluate_model(image_path, params, cache_dir="cache", compute_masks=True, lo
         print(f"\tEVALUATING: {model_name}")
         try:
 
-            device = check_set_gpu()  # get available torch device (CPU, GPU or MPS)
+            # # Load the Cellpose model
+            # model = Cellpose(
+            #     model_type = params.model_name,
+            #     device = device,
+            #     nchan = 2,  # TODO check if this is correct = 1?
+            #     # diam_mean = 30,
+            #     gpu = False,
+            # )
 
-            # Load the Cellpose model
-            model = Cellpose(
-                model_type = params.model_name,
-                device = device,
-                nchan = 2,  # TODO check if this is correct = 1?
-                # diam_mean = 30, # TODO how to change this?
-                gpu = False,
-            )
 
-            masks, flows, styles, diams = model.eval(
+            # diam_mean = 30.  # default for any cyto model
+            # nuclear = "nuclei" in params.model_name
+            # if nuclear:
+            #     diam_mean = 17.
+
+            model = CellposeModel(device=device, gpu=False, model_type=params.model_name,
+                                    diam_mean=params.diameter, nchan=2,
+                                    backbone="default")
+
+            masks, flows, styles = model.eval(
                 image,
                 cellprob_threshold=params.cellprob_threshold,
                 channel_axis=params.channel_axis,
@@ -187,11 +192,11 @@ def evaluate_model(image_path, params, cache_dir="cache", compute_masks=True, lo
                 normalize=params.normalize,
                 z_axis=0,  # TODO: z-axis parameter always 0?
             )
-            save_to_cache(cache_dir, cache_key, masks, flows, styles, diams)
+            save_to_cache(cache_dir, cache_key, masks, flows, styles, params.diameter)
 
         except Exception as e:
             print(f"Error: {e}")
-            return None
+            return EvaluationError.EVALUATION_ERROR
 
     if not compute_masks:
         # dP_colors = flows[0]
@@ -222,7 +227,7 @@ def evaluate_model(image_path, params, cache_dir="cache", compute_masks=True, lo
 
     if masks is None:
         print(f"Error: No masks found with parameters")
-        return None
+        return EvaluationError.EMPTY_MASKS
 
     else:
         # jaccard = jaccard_score(ground_truth, masks)
@@ -318,3 +323,9 @@ def read_yaml(yaml_file: str = "") -> EvaluationParams:
     )
 
     return params
+
+
+class EvaluationError(Enum):
+    GROUND_TRUTH_NOT_AVAILABLE = "Ground truth not available"
+    EVALUATION_ERROR = "Evaluation error"
+    EMPTY_MASKS = "Empty masks"
