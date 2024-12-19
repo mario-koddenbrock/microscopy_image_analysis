@@ -38,7 +38,7 @@ def load_image_with_gt(image_path, type):
     # Read image with cellpose.io
     image_orig = io.imread(image_path)
     ground_truth = get_cellpose_ground_truth(image_path, image_name, type)
-    return ground_truth, image_name, image_orig
+    return ground_truth, image_orig
 
 
 def get_cellpose_ground_truth(image_path, image_name, type="Nuclei"):

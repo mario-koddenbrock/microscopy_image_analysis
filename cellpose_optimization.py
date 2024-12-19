@@ -2,18 +2,14 @@ import glob
 import os
 import random
 
-from cellpose import io
+import wandb
 
-from mia.cellpose import evaluation_params, evaluate_model
-from mia.file_io import get_cellpose_ground_truth
+from mia.cellpose import evaluation_params, evaluate_model, EvaluationError
 from mia.results import ResultHandler
 from mia.utils import check_paths
 from mia.viz import show_napari
 
-
-# TODO use CellposeModel instead of Cellpose class
-# setting PYTORCH_ENABLE_MPS_FALLBACK=1
-
+# TODO use MPI
 
 def optimize_parameters(
         image_dir: str = "",
@@ -22,6 +18,7 @@ def optimize_parameters(
         cache_dir: str = "cache",
         show_viewer: bool = False,
         num_parameters: int = 100,
+        log_wandb: bool = False,
 ):
 
     check_paths(image_dir, output_dir, cache_dir)
@@ -32,20 +29,44 @@ def optimize_parameters(
     # Loop over the images
     for image_idx, image_path in enumerate(image_paths):
 
+        image_name = os.path.basename(image_path).replace(".tif", "")
+
         # Set the random seed based on the image index
         random.seed(image_idx)
 
-        # Sample a fixed number of parameter combinations
-        sampled_params = random.sample(evaluation_params, num_parameters)
-        for param_idx, params in enumerate(sampled_params):
+        # get indices of the parameters to evaluate
+        idx = random.sample(range(len(evaluation_params)), num_parameters)
 
-            results = evaluate_model(image_path, params, cache_dir)
+        print(f"Image {image_idx+1}/{len(image_paths)}: {image_path}")
+        sampled_params = [evaluation_params[i] for i in idx]
 
-            if results is not None:
+        for type in ["Nuclei", "Membranes"]:
+
+            if log_wandb:
+                wandb.init(
+                    project="organoid_segmentation",
+                    name=f"{image_name}_{type}",
+                )
+
+            for param_idx, params in enumerate(sampled_params):
+
+                params.type = type
+                print(f"Parameter set {param_idx+1}/{num_parameters}")
+                results = evaluate_model(image_path, params, cache_dir)
+
+                if results == EvaluationError.GROUND_TRUTH_NOT_AVAILABLE:
+                    break
+                elif not isinstance(results, dict):
+                    continue
+
                 result_handler.log_result(results, params)
 
-            if show_viewer:
-                show_napari(results, params)
+                if show_viewer:
+                    show_napari(results, params)
+
+                if results["f1"] > 0.95:
+                    print(f"Found good parameters for {type} on {image_path}")
+                    break
 
 
 
