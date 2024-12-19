@@ -3,14 +3,16 @@ import os
 from collections import OrderedDict
 from dataclasses import asdict
 
+import wandb
 import yaml
 from prettytable import PrettyTable
 import pandas as pd
 
 
 class ResultHandler:
-    def __init__(self, result_file, keep_existing=False):
+    def __init__(self, result_file, log_wandb=False, keep_existing=False):
         self.result_path = result_file
+        self.log_wandb = log_wandb
 
         # if not keep_existing and os.path.exists(result_path):
         #     os.remove(result_path)
@@ -32,7 +34,13 @@ class ResultHandler:
             "precision": results["precision"],
             "recall": results["recall"],
             "f1": results["f1"],
+            "jaccard_sklearn": results["jaccard_sklearn"],
+            "jaccard_cellpose": results["jaccard_cellpose"],
         })
+
+        # Log to W&B
+        if self.log_wandb:
+            wandb.log(properties)
 
         # Ensure image_name is the first column
         ordered_properties = OrderedDict([("image_name", results["image_name"])])
@@ -65,7 +73,7 @@ class ResultHandler:
             table.field_names = reader.fieldnames
             for row in reader:
                 formatted_row = [
-                    f"{float(row[field]):.2f}" if field in ['are', 'precision', 'recall', 'f1', 'duration'] else row[field] for
+                    f"{float(row[field]):.3f}" if field in ['are', 'precision', 'recall', 'f1', 'duration', 'jaccard', 'jaccard_sklearn', 'jaccard_cellpose'] else row[field] for
                     field in reader.fieldnames]
                 table.add_row(formatted_row)
             print(table)

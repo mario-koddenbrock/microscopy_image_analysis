@@ -15,14 +15,14 @@ def optimize_parameters(
         result_file: str = "",
         cache_dir: str = "cache",
         show_viewer: bool = False,
-        num_parameters: int = 100,
+        num_parameters: int = 1e12,
         log_wandb: bool = True,
 ):
 
     check_paths(image_dir, output_dir, cache_dir)
     image_paths = glob.glob(os.path.join(image_dir, "*.tif")) # Get the list of images
 
-    result_handler = ResultHandler(result_file)
+    result_handler = ResultHandler(result_file, log_wandb)
 
     # Loop over the images
     for image_idx, image_path in enumerate(image_paths):
@@ -32,30 +32,33 @@ def optimize_parameters(
         # Set the random seed based on the image index
         random.seed(image_idx)
 
-        # get indices of the parameters to evaluate
-        idx = random.sample(range(len(evaluation_params)), num_parameters)
 
-        print(f"Image {image_idx+1}/{len(image_paths)}: {image_path}")
+        # get indices of the parameters to evaluate
+        if num_parameters > len(evaluation_params):
+            num_parameters = len(evaluation_params)
+        idx = random.sample(range(len(evaluation_params)), num_parameters)
         sampled_params = [evaluation_params[i] for i in idx]
 
         for type in ["Nuclei", "Membranes"]:
+            print(f"{type} {image_idx+1}/{len(image_paths)}: {image_path}")
 
-            if log_wandb:
-                wandb.init(
-                    project="organoid_segmentation",
-                    name=f"{image_name}_{type}",
-                )
-
+            wandb_initilized = False
             for param_idx, params in enumerate(sampled_params):
 
                 params.type = type
                 print(f"Parameter set {param_idx+1}/{num_parameters}")
-                results = evaluate_model(image_path, params, cache_dir, log_wandb=log_wandb)
+
+                results = evaluate_model(image_path, params, cache_dir)
 
                 if results == EvaluationError.GROUND_TRUTH_NOT_AVAILABLE:
                     break
                 elif not isinstance(results, dict):
                     continue
+
+                if not wandb_initilized:
+                    if log_wandb:
+                        wandb_initilized = True
+                        wandb.init(project="organoid_segmentation", name=f"{image_name}_{type}")
 
                 result_handler.log_result(results, params)
 
@@ -66,6 +69,8 @@ def optimize_parameters(
                     print(f"Found good parameters for {type} on {image_path}")
                     break
 
+            if log_wandb and wandb_initilized:
+                wandb.finish()
 
 
 

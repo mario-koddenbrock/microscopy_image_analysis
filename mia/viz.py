@@ -183,7 +183,7 @@ def plot_aggregated_metric_variation(file_path, metric='f1', boxplot=False):
     output_dir = os.path.dirname(file_path)
 
     # Identify varying parameters (excluding fixed columns and specified metrics)
-    excluded_columns = ['image_name', 'type', metric, 'duration', 'are', 'precision', 'recall', 'f1']
+    excluded_columns = ['image_name', 'type', metric, 'duration', 'are', 'precision', 'recall', 'f1', 'jaccard_sklearn', 'jaccard_cellpose', 'jaccard']
     varying_columns = [col for col in df.columns if df[col].nunique() > 1 and col not in excluded_columns]
 
     if not varying_columns:

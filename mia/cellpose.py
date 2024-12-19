@@ -1,13 +1,17 @@
 import itertools
 import os
 import time
+from medpy.metric.binary import jc
+
 from dataclasses import dataclass
 from enum import Enum
 
 import wandb
 import yaml
+import numpy as np
 from cellpose import transforms
-from cellpose.models import Cellpose, CellposeModel
+from cellpose.metrics import aggregated_jaccard_index
+from cellpose.models import CellposeModel
 from skimage.metrics import adapted_rand_error
 from sklearn.metrics import jaccard_score
 
@@ -118,7 +122,7 @@ evaluation_params = [
 
 
 
-def evaluate_model(image_path, params, cache_dir="cache", compute_masks=True, log_wandb=False):
+def evaluate_model(image_path, params, cache_dir="cache", compute_masks=True):
     t0 = time.time()
 
     image_name = os.path.basename(image_path).replace(".tif", "")
@@ -237,14 +241,20 @@ def evaluate_model(image_path, params, cache_dir="cache", compute_masks=True, lo
         # jaccard = jaccard_score(ground_truth, masks)
         # fscore = f1_score(ground_truth, masks)
 
-        jaccard = jaccard_score(ground_truth > 0, masks > 0, average='macro')
+        # jaccard = jc(masks, ground_truth)
+
+        jaccard_sklearn = jaccard_score(ground_truth.flatten(), masks.flatten(), average='micro')
+        aji_scores = aggregated_jaccard_index(ground_truth, masks)
+        jaccard_cellpose = np.mean(aji_scores)
+
         are, precision, recall = adapted_rand_error(ground_truth, masks)
         f1 = 2 * (precision * recall) / (precision + recall) if precision + recall > 0 else 0
         print(f"\tAdapted Rand Error: {are:.2f}")
         print(f"\tPrecision: {precision:.2f}")
         print(f"\tRecall: {recall:.2f}")
         print(f"\tF1: {f1:.2f}")
-        print(f"\tJaccard: {jaccard:.2f}")
+        print(f"\tJaccard (sklearn): {jaccard_sklearn:.2f}")
+        print(f"\tJaccard (cellpose): {jaccard_cellpose:.2f}")
 
     # fig = plt.figure(figsize=(12, 5))
     # plot.show_segmentation(fig, image, masks, flows, channels=[0, 0])
@@ -260,22 +270,13 @@ def evaluate_model(image_path, params, cache_dir="cache", compute_masks=True, lo
         "precision": precision,
         "recall": recall,
         "f1": f1,
-        "jaccard": jaccard,
+        "jaccard_sklearn": jaccard_sklearn,
+        "jaccard_cellpose": jaccard_cellpose,
         "duration": duration,
     }
 
-    # Log to W&B
-    if log_wandb:
-        wandb.log({
-            **params,
-            "duration": duration,
-            "adapted_rand_error": are,
-            "precision": precision,
-            "recall": recall,
-            "f1": f1,
-            "image_name": image_name,
-        })
-        wandb.finish()
+
+
 
 
     return results
