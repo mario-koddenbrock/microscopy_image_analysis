@@ -6,7 +6,6 @@ from dataclasses import asdict
 import yaml
 from prettytable import PrettyTable
 import pandas as pd
-import json
 
 
 class ResultHandler:
@@ -85,6 +84,7 @@ def print_best_config_per_image(file_path, metric='f1', output_file='best_config
         output_file (str): Path to save the best configurations (default is 'best_configs.json').
     """
     # Load data
+
     try:
         df = pd.read_csv(file_path)
     except FileNotFoundError:
