@@ -194,14 +194,23 @@ def plot_aggregated_metric_variation(file_path, metric='f1', boxplot=False):
 
     # Aggregate metric over all image_name and type
     for param in varying_columns:
+        fig, ax = plt.subplots(figsize=(6, 4))
+
         if boxplot:
             # Create boxplot for the metric grouped by the parameter
-            # plt.figure(figsize=(8, 5))
-            df.boxplot(column=metric, by=param, grid=False)
-            plt.title(f"Boxplot of {metric} vs {param} (over all images)")
+            df.boxplot(column=metric, by=param, grid=False, ax=ax)
+            # ax.set_title(f"Boxplot of {metric} vs {param} (over all images)")
+
+            if len(pd.unique(df[param])) > 10:
+                ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='right')
+            else:
+                ax.set_xticklabels(ax.get_xticklabels(), rotation=0, ha='center')
+
+            plt.xticks(rotation=45, ha='right')
+            ax.set_xlabel(param)
+            ax.set_ylabel(metric)
+            plt.title("")
             plt.suptitle("")  # Remove default title
-            plt.xlabel(param)
-            plt.ylabel(metric)
             output_path = os.path.join(output_dir, f"boxplot_{param}_{metric}.png")
 
         else:
@@ -211,19 +220,25 @@ def plot_aggregated_metric_variation(file_path, metric='f1', boxplot=False):
             y = grouped['mean']
             yerr = grouped['std']
 
-            plt.figure(figsize=(8, 5))
-            plt.errorbar(x, y, yerr=yerr, fmt='-o', capsize=5, label=f"{metric} (mean ± std)")
-            plt.xlabel(param)
-            plt.ylabel(f"Aggregated {metric}")
-            plt.title(f"Aggregated {metric} vs {param} (over all images)")
-            plt.legend()
-            plt.grid(True)
+            ax.errorbar(x, y, yerr=yerr, fmt='-o', capsize=5, label=f"{metric} (mean ± std)")
+
+
+            if len(x) > 10:
+                ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='right')
+
+            ax.set_xlabel(param)
+            ax.set_ylabel(f"Aggregated {metric}")
+            # ax.set_title(f"Aggregated {metric} vs {param} (over all images)")
+            ax.legend()
+            ax.grid(True)
             output_path = os.path.join(output_dir, f"errorbar_{param}_{metric}.png")
 
+        plt.tight_layout()
         plt.savefig(output_path)
         plt.show()
-        # plt.close()
+        plt.close(fig)
         print(f"Saved plot to {output_path}")
+
 
 
 def plot_best_scores_barplot(file_path, metric='f1', output_file='best_scores_barplot.png'):
@@ -252,7 +267,7 @@ def plot_best_scores_barplot(file_path, metric='f1', output_file='best_scores_ba
     grouped.plot(kind='bar', figsize=(12, 6), alpha=0.8, edgecolor='black')
 
     # Plot customization
-    plt.title(f"Best {metric} Scores for Each Image and Type")
+    # plt.title(f"Best {metric} Scores for Each Image and Type")
     plt.xlabel("Image Name")
     plt.ylabel(f"Best {metric} Score")
     plt.xticks(rotation=45, ha='right')
