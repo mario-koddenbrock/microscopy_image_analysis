@@ -9,6 +9,7 @@ import yaml
 from cellpose import transforms
 from cellpose.models import Cellpose, CellposeModel
 from skimage.metrics import adapted_rand_error
+from sklearn.metrics import jaccard_score
 
 from mia.file_io import load_image_with_gt
 from mia.hash import save_to_cache, compute_hash, load_from_cache
@@ -236,17 +237,32 @@ def evaluate_model(image_path, params, cache_dir="cache", compute_masks=True, lo
         # jaccard = jaccard_score(ground_truth, masks)
         # fscore = f1_score(ground_truth, masks)
 
+        jaccard = jaccard_score(ground_truth > 0, masks > 0, average='macro')
         are, precision, recall = adapted_rand_error(ground_truth, masks)
         f1 = 2 * (precision * recall) / (precision + recall) if precision + recall > 0 else 0
         print(f"\tAdapted Rand Error: {are:.2f}")
         print(f"\tPrecision: {precision:.2f}")
         print(f"\tRecall: {recall:.2f}")
         print(f"\tF1: {f1:.2f}")
+        print(f"\tJaccard: {jaccard:.2f}")
 
     # fig = plt.figure(figsize=(12, 5))
     # plot.show_segmentation(fig, image, masks, flows, channels=[0, 0])
 
     duration = time.time() - t0
+
+    results = {
+        "image": image,
+        "image_name": image_name,
+        "ground_truth": ground_truth,
+        "masks": masks,
+        "are": are,
+        "precision": precision,
+        "recall": recall,
+        "f1": f1,
+        "jaccard": jaccard,
+        "duration": duration,
+    }
 
     # Log to W&B
     if log_wandb:
@@ -261,17 +277,6 @@ def evaluate_model(image_path, params, cache_dir="cache", compute_masks=True, lo
         })
         wandb.finish()
 
-    results = {
-        "image": image,
-        "image_name": image_name,
-        "ground_truth": ground_truth,
-        "masks": masks,
-        "are": are,
-        "precision": precision,
-        "recall": recall,
-        "f1": f1,
-        "duration": duration,
-    }
 
     return results
 

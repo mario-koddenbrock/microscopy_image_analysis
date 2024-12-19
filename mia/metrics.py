@@ -2,11 +2,6 @@ import numpy as np
 from cellpose.metrics import aggregated_jaccard_index, average_precision
 
 
-def jaccard_score(ground_truth, masks):
-    aji_scores = aggregated_jaccard_index(ground_truth, masks)
-    return np.mean(aji_scores)
-
-
 def f1_score(ground_truth, masks):
     ap, tp, fp, fn = average_precision(ground_truth, masks)
     precision = np.sum(tp) / np.sum(tp + fp)
