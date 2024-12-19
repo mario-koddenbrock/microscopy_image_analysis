@@ -9,8 +9,6 @@ from mia.results import ResultHandler
 from mia.utils import check_paths
 from mia.viz import show_napari
 
-# TODO use MPI
-
 def optimize_parameters(
         image_dir: str = "",
         output_dir: str = "",
@@ -18,7 +16,7 @@ def optimize_parameters(
         cache_dir: str = "cache",
         show_viewer: bool = False,
         num_parameters: int = 100,
-        log_wandb: bool = False,
+        log_wandb: bool = True,
 ):
 
     check_paths(image_dir, output_dir, cache_dir)
@@ -52,7 +50,7 @@ def optimize_parameters(
 
                 params.type = type
                 print(f"Parameter set {param_idx+1}/{num_parameters}")
-                results = evaluate_model(image_path, params, cache_dir)
+                results = evaluate_model(image_path, params, cache_dir, log_wandb=log_wandb)
 
                 if results == EvaluationError.GROUND_TRUTH_NOT_AVAILABLE:
                     break
