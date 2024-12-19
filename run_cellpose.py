@@ -1,14 +1,10 @@
 import argparse
-import glob
 import os
 
 import napari
 import numpy as np
-from cellpose import models, io
-from segmentation_models_pytorch.metrics import precision
 
 from mia.cellpose import evaluate_model, read_yaml
-from mia.file_io import get_cellpose_ground_truth
 from mia.utils import check_paths
 from mia.viz import extract_cellpose_video
 
@@ -23,10 +19,13 @@ def view(
         video_3d=True,
         show_viewer = True,
         export_video = False,
+        type="Nuclei", # Nuclei or Membranes
 ):
 
     params = read_yaml(param_file)
-    check_paths(image_dir, output_dir, cache_dir)
+    params.type = type
+
+    check_paths(image_path, output_dir, cache_dir)
 
     print(f"Processing image: {image_path}")
     results = evaluate_model(image_path, params, cache_dir)
@@ -124,8 +123,9 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="View cellpose results with Napari.")
     parser.add_argument("image_path", type=str, help="Path to the image file.")
+    parser.add_argument("type", type=str, help="Membranes or Nuclei.")
     parser.add_argument("param_file", type=str, help="Path to the parameter YAML file.")
-    parser.add_argument("output_dir", type=str, help="Directory to save the output.")
+    parser.add_argument("--output_dir", type=str, default="output", help="Directory to save the output.")
     parser.add_argument("--cache_dir", type=str, default="cache", help="Directory for cache files.")
     parser.add_argument("--show_gt", action="store_true", help="Show ground truth labels.")
     parser.add_argument("--show_prediction", action="store_true", help="Show prediction labels.")
@@ -145,6 +145,7 @@ if __name__ == "__main__":
         video_3d=args.video_3d,
         show_viewer=args.show_viewer,
         export_video=args.export_video,
+        type=args.type,
     )
 
     # main_folder = "Datasets/P013T/"
