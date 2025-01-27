@@ -12,9 +12,10 @@ class BLIPEvaluator:
         self._load_model()
 
     def _load_model(self):
-        self.model = BlipForConditionalGeneration.from_pretrained(self.model_id).to(self.device)
+        self.model = BlipForConditionalGeneration.from_pretrained(self.model_id).to(
+            self.device
+        )
         self.processor = BlipProcessor.from_pretrained(self.model_id)
-
 
     def _load_image(self, image_path):
         return pil_loader(image_path)
@@ -22,6 +23,8 @@ class BLIPEvaluator:
     def evaluate(self, prompt, image_path, max_new_tokens=50):
         # Load the image (from URL or local)
         image = self._load_image(image_path)
-        inputs = self.processor(images=image, text=prompt, return_tensors="pt").to(self.device)
+        inputs = self.processor(images=image, text=prompt, return_tensors="pt").to(
+            self.device
+        )
         output = self.model.generate(**inputs, max_new_tokens=max_new_tokens)
         return self.processor.decode(output[0], skip_special_tokens=True)

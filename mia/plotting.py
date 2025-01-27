@@ -24,7 +24,7 @@ def show_prediction_result(image_path, dataset_name, ground_truth, results):
     # Set up the figure and axes for plotting
     fig, ax = plt.subplots(figsize=(8, 10))
     ax.imshow(image)
-    ax.axis('off')  # Hide axes
+    ax.axis("off")  # Hide axes
 
     # Prepare the text to display (ground truth and VLM results)
     text_str = f"Ground Truth: {ground_truth}\n\n"
@@ -39,12 +39,18 @@ def show_prediction_result(image_path, dataset_name, ground_truth, results):
 
     # Add the text box in the bottom-right corner
     ax.text(
-        0.95, 0.05, text_str,
+        0.95,
+        0.05,
+        text_str,
         transform=ax.transAxes,  # Position relative to axes
         fontsize=15,  # Smaller font size
-        verticalalignment='bottom',  # Align text box at the bottom
-        horizontalalignment='right',  # Align text box to the right
-        bbox={'facecolor': 'white', 'alpha': 0.5, 'pad': 5},  # White background with transparency
+        verticalalignment="bottom",  # Align text box at the bottom
+        horizontalalignment="right",  # Align text box to the right
+        bbox={
+            "facecolor": "white",
+            "alpha": 0.5,
+            "pad": 5,
+        },  # White background with transparency
         wrap=True,  # Wrap text if it exceeds the width of the image
     )
 
@@ -64,15 +70,21 @@ def show_prediction_result(image_path, dataset_name, ground_truth, results):
 
     # Save the plot to the specified output file
     plt.tight_layout()
-    plt.savefig(save_to, bbox_inches='tight', dpi=300)
+    plt.savefig(save_to, bbox_inches="tight", dpi=300)
     plt.close()
 
     # print(f"\t\tResults plotted and saved to {save_to}")
     return save_to
 
 
-
-def visualize_class_samples(dataset, class_names, num_classes=8, image_size=(224, 224), save_dir='results/Classification', save_filename='class_samples.png'):
+def visualize_class_samples(
+    dataset,
+    class_names,
+    num_classes=8,
+    image_size=(224, 224),
+    save_dir="results/Classification",
+    save_filename="class_samples.png",
+):
     """
     Visualizes one sample image from each class in a grid (5 rows per column) and saves the plot.
 
@@ -90,7 +102,9 @@ def visualize_class_samples(dataset, class_names, num_classes=8, image_size=(224
     for path, label in dataset.samples:  # dataset.samples contains paths and labels
         class_name = class_names[label]
         if class_name not in class_images:
-            class_images[class_name] = file_io.rasterio_loader(path)  # Load image using rasterio_loader
+            class_images[class_name] = file_io.rasterio_loader(
+                path
+            )  # Load image using rasterio_loader
         if len(class_images) == num_classes:
             break
 
@@ -110,14 +124,14 @@ def visualize_class_samples(dataset, class_names, num_classes=8, image_size=(224
     for i, (img, ax) in enumerate(zip(image_list, axes)):
         # Display the image loaded from rasterio
         ax.imshow(img)
-        ax.axis('off')
+        ax.axis("off")
 
         # Set the title to the class name
         ax.set_title(class_names[i], fontsize=12)
 
     # Hide any unused subplots
     for j in range(i + 1, len(axes)):
-        axes[j].axis('off')
+        axes[j].axis("off")
         axes[j].set_xticklabels([])
         axes[j].set_yticklabels([])
 
@@ -129,14 +143,16 @@ def visualize_class_samples(dataset, class_names, num_classes=8, image_size=(224
 
     # Save the plot
     save_path = os.path.join(save_dir, save_filename)
-    plt.savefig(save_path, bbox_inches='tight')
+    plt.savefig(save_path, bbox_inches="tight")
     print(f"Visualization saved to {save_path}")
 
     # Show the plot
     plt.show()
 
 
-def plot_image_grid(image_list, num_classes=33, figsize=(20, 20), rows=5, image_name="vlm_results.png"):
+def plot_image_grid(
+    image_list, num_classes=33, figsize=(20, 20), rows=5, image_name="vlm_results.png"
+):
     """
     Plots a grid of images from a list.
 
@@ -162,19 +178,18 @@ def plot_image_grid(image_list, num_classes=33, figsize=(20, 20), rows=5, image_
 
             # Convert the image to a NumPy array and plot it
             ax.imshow(np.array(img))
-        ax.axis('off')  # Hide the axes
-
+        ax.axis("off")  # Hide the axes
 
     save_to = os.path.join("results", "Classification", image_name)
 
     # Save the plot to the specified output file
     plt.tight_layout()
-    plt.savefig(save_to, bbox_inches='tight', dpi=300)
+    plt.savefig(save_to, bbox_inches="tight", dpi=300)
     # plt.close()
 
 
-if __name__ == '__main__':
-    data_dir = os.path.join('../datasets', 'Classification')
+if __name__ == "__main__":
+    data_dir = os.path.join("../datasets", "Classification")
 
     # Load the dataset (without splitting) to visualize images
     full_dataset = datasets.ImageFolder(data_dir, transform=transforms.ToTensor())

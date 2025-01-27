@@ -1,12 +1,11 @@
 import csv
 import os
-from collections import OrderedDict
-from dataclasses import asdict
 
-import wandb
+import pandas as pd
 import yaml
 from prettytable import PrettyTable
-import pandas as pd
+
+import wandb
 
 
 class ResultHandler:
@@ -17,7 +16,6 @@ class ResultHandler:
         # if not keep_existing and os.path.exists(result_path):
         #     os.remove(result_path)
 
-
     def log_result(self, results, evaluation_params):
         """
         Log a new result to the CSV file.
@@ -26,28 +24,37 @@ class ResultHandler:
             results (dict): All results in one dict.
             evaluation_params (EvaluationParams): The parameters as a dataclass instance.
         """
-        # Convert dataclass to dictionary and add additional metrics
-        properties = asdict(evaluation_params)
-        properties.update({
-            "duration": results["duration"],
-            "are": results["are"],
-            "precision": results["precision"],
-            "recall": results["recall"],
-            "f1": results["f1"],
-            "jaccard_sklearn": results["jaccard_sklearn"],
-            "jaccard_cellpose": results["jaccard_cellpose"],
-        })
+
+        # create a new dataframe to collect all the results
+        out = pd.Series()
+
+        # 1. add the image name and type
+        out["image_name"] = results["image_name"]
+        out["type"] = evaluation_params.type
+
+        # 2. add the rest of the evaluation parameters
+        keys = evaluation_params.__dict__.keys()
+        for key in keys:
+            # skip the image name and type
+            if key == "image_name" or key == "type":
+                continue
+            out[key] = evaluation_params.__dict__[key]
+
+        # 3. add the results
+        out["duration"] = results["duration"]
+        out["are"] = results["are"]
+        out["precision"] = results["precision"]
+        out["recall"] = results["recall"]
+        out["f1"] = results["f1"]
+        out["jaccard"] = results["jaccard"]
+        out["jaccard_cellpose"] = results["jaccard_cellpose"]
 
         # Log to W&B
         if self.log_wandb:
-            wandb.log(properties)
-
-        # Ensure image_name is the first column
-        ordered_properties = OrderedDict([("image_name", results["image_name"])])
-        ordered_properties.update(properties)
+            wandb.log(out.to_dict())
 
         # Ensure consistent fieldnames (in the same order as OrderedDict keys)
-        fieldnames = list(ordered_properties.keys())
+        fieldnames = list(out.keys())
 
         # Check if file exists
         file_exists = os.path.exists(self.result_path)
@@ -57,7 +64,7 @@ class ResultHandler:
             writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
             if not file_exists or os.stat(self.result_path).st_size == 0:
                 writer.writeheader()  # Write header only if file is new or empty
-            writer.writerow(ordered_properties)
+            writer.writerow(out.to_dict())
 
         self.print_results()
 
@@ -73,22 +80,34 @@ class ResultHandler:
             table.field_names = reader.fieldnames
             for row in reader:
                 formatted_row = [
-                    f"{float(row[field]):.3f}" if field in ['are', 'precision', 'recall', 'f1', 'duration', 'jaccard', 'jaccard_sklearn', 'jaccard_cellpose'] else row[field] for
-                    field in reader.fieldnames]
+                    (
+                        f"{float(row[field]):.3f}"
+                        if field
+                        in [
+                            "are",
+                            "precision",
+                            "recall",
+                            "f1",
+                            "duration",
+                            "jaccard",
+                            "jaccard_cellpose",
+                        ]
+                        else row[field]
+                    )
+                    for field in reader.fieldnames
+                ]
                 table.add_row(formatted_row)
             print(table)
 
 
-
-
-def print_best_config_per_image(file_path, metric='f1', output_file='best_configs.json'):
+def print_best_config_per_image(file_path, metric="jaccard"):
     """
     Print the best configuration for each unique image_name and type combination based on the specified metric.
     Save the best configurations to an output JSON file.
 
     Parameters:
         file_path (str): Path to the CSV file containing experiment results.
-        metric (str): The column name of the metric to evaluate (default is 'f1').
+        metric (str): The column name of the metric to evaluate (default is 'jaccard').
         output_file (str): Path to save the best configurations (default is 'best_configs.json').
     """
     # Load data
@@ -105,17 +124,17 @@ def print_best_config_per_image(file_path, metric='f1', output_file='best_config
     # Ensure the metric column exists
     if metric not in df.columns:
         print(f"Error: '{metric}' is not a valid column in the file.")
-        print("Available columns:", ', '.join(df.columns))
+        print("Available columns:", ", ".join(df.columns))
         return
 
     # Round the metric column to 2 decimal places
     df[metric] = df[metric].round(2)
 
     # Find the best configuration per image_name and type based on the metric
-    best_configs = df.loc[df.groupby(['image_name', 'type'])[metric].idxmax()]
+    best_configs = df.loc[df.groupby(["image_name", "type"])[metric].idxmax()]
 
     # Sort for better readability
-    best_configs = best_configs.sort_values(by=['image_name', 'type'])
+    best_configs = best_configs.sort_values(by=["image_name", "type"])
 
     # Create output directory in the same folder as the input file
     output_dir = os.path.dirname(file_path)
@@ -123,12 +142,25 @@ def print_best_config_per_image(file_path, metric='f1', output_file='best_config
         os.makedirs(output_dir)
 
     # Save each configuration to a separate YAML file
-    excluded_columns = ['image_name', 'type', 'duration', 'are', 'precision', 'recall', 'f1']
+    excluded_columns = [
+        "image_name",
+        "type",
+        "duration",
+        "are",
+        "precision",
+        "recall",
+        "f1",
+        "jaccard",
+        "jaccard_cellpose",
+        "jaccard",
+    ]
     for _, row in best_configs.iterrows():
-        config = {col: row[col] for col in best_configs.columns if col not in excluded_columns}
+        config = {
+            col: row[col] for col in best_configs.columns if col not in excluded_columns
+        }
         file_name = f"{row['image_name']}_{row['type']}_config.yaml"
         file_path = os.path.join(output_dir, file_name)
-        with open(file_path, 'w') as yaml_file:
+        with open(file_path, "w") as yaml_file:
             yaml.dump(config, yaml_file, default_flow_style=False)
         print(f"Saved configuration to {file_path}")
 
@@ -140,6 +172,6 @@ def print_best_config_per_image(file_path, metric='f1', output_file='best_config
         print(f"  Best {metric}: {row[metric]}")
         print("  Configuration:")
         for col in df.columns:
-            if col not in ['image_name', 'type', metric]:
+            if col not in ["image_name", "type", metric]:
                 print(f"    {col}: {row[col]}")
         print("-")

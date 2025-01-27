@@ -15,13 +15,14 @@ class ViltEvaluator:
         self.model = ViltModel.from_pretrained(self.model_id).to(self.device)
         self.processor = ViltProcessor.from_pretrained(self.model_id)
 
-
     def _load_image(self, image_path):
         return pil_loader(image_path)
 
     def evaluate(self, prompt, image_path):
         # Load the image (from URL or local)
         image = self._load_image(image_path)
-        inputs = self.processor(text=prompt, images=image, return_tensors="pt").to(self.device)
+        inputs = self.processor(text=prompt, images=image, return_tensors="pt").to(
+            self.device
+        )
         outputs = self.model.generate(**inputs)
         return self.processor.decode(outputs[0], skip_special_tokens=True)

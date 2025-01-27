@@ -5,27 +5,24 @@ import napari
 import numpy as np
 
 from mia.cellpose import evaluate_model, read_yaml
-from mia.utils import check_paths
 from mia.viz import extract_cellpose_video
 
 
 def view(
-        image_path,
-        param_file,
-        output_dir,
-        cache_dir="cache",
-        show_gt=True,
-        show_prediction=False,
-        video_3d=True,
-        show_viewer = True,
-        export_video = False,
-        type="Nuclei", # Nuclei or Membranes
+    image_path,
+    param_file,
+    output_dir,
+    cache_dir="cache",
+    show_gt=True,
+    show_prediction=False,
+    video_3d=True,
+    show_viewer=True,
+    export_video=False,
+    type="Nuclei",  # Nuclei or Membranes
 ):
 
     params = read_yaml(param_file)
     params.type = type
-
-    check_paths(image_path, output_dir, cache_dir)
 
     print(f"Processing image: {image_path}")
     results = evaluate_model(image_path, params, cache_dir)
@@ -33,13 +30,13 @@ def view(
     if results is None:
         print(f"Failed to process image {image_path}")
 
-    image = results['image']
-    masks = results['masks']
-    ground_truth = results['ground_truth']
-    are = results['are']
-    precision = results['precision']
-    recall = results['recall']
-    f1 = results['f1']
+    image = results["image"]
+    masks = results["masks"]
+    ground_truth = results["ground_truth"]
+    are = results["are"]
+    precision = results["precision"]
+    recall = results["recall"]
+    f1 = results["f1"]
 
     print(f"shape: {image.shape}")
     print(f"dtype: {image.dtype}")
@@ -55,15 +52,16 @@ def view(
     # Initialize the Napari viewer
     viewer = napari.Viewer()
 
+    return
     # get the interquartile range of the intensities
     q1, q3 = np.percentile(image, [5, 99])
 
     # Add the image to the viewer
     viewer.add_image(
         image,
-        contrast_limits=[q1, q3],
-        name='Organoids',
-        colormap='gray',
+        # contrast_limits=[q1, q3],
+        name="Organoids",
+        colormap="gray",
     )
 
     if show_gt and (ground_truth is not None):
@@ -71,7 +69,7 @@ def view(
             ground_truth,
             name="Ground truth",
             opacity=0.7,
-            blending='translucent',
+            blending="translucent",
             # colormap='magma',
         )
         layer.contour = 2
@@ -82,7 +80,7 @@ def view(
             masks,
             name=params.model_name,
             opacity=0.7,
-            blending='translucent',
+            blending="translucent",
             # colormap='magma',
         )
         layer.contour = 2
@@ -104,7 +102,9 @@ def view(
 
         mode = "3D" if video_3d else "2D"
         num_z_slices = image.shape[0]
-        extract_cellpose_video(viewer, output_dir, video_filename, num_z_slices, mode=mode)
+        extract_cellpose_video(
+            viewer, output_dir, video_filename, num_z_slices, mode=mode
+        )
 
         # Close the viewer to release resources
         viewer.close()
@@ -122,15 +122,40 @@ if __name__ == "__main__":
     # python run_cellpose.py path/to/image.tif path/to/params.yaml path/to/output --show_gt --show_prediction --show_viewer
 
     parser = argparse.ArgumentParser(description="View cellpose results with Napari.")
-    parser.add_argument("image_path", type=str, help="Path to the image file.")
-    parser.add_argument("type", type=str, help="Membranes or Nuclei.")
-    parser.add_argument("param_file", type=str, help="Path to the parameter YAML file.")
-    parser.add_argument("--output_dir", type=str, default="output", help="Directory to save the output.")
-    parser.add_argument("--cache_dir", type=str, default="cache", help="Directory for cache files.")
-    parser.add_argument("--show_gt", action="store_true", help="Show ground truth labels.")
-    parser.add_argument("--show_prediction", action="store_true", help="Show prediction labels.")
+    parser.add_argument(
+        "--image_path",
+        type=str,
+        default="Datasets/P013T/20240305_P013T_40xSil_Hoechst_SiRActin/images_cropped_isotropic/20240305_P013T_A003_cropped_isotropic.tif",
+        help="Path to the image file.",
+    )
+    parser.add_argument(
+        "--type", type=str, default="Nuclei", help="Membranes or Nuclei."
+    )
+    parser.add_argument(
+        "--param_file",
+        type=str,
+        default="Datasets/P013T/20240305_P013T_A003_cropped_isotropic_Nuclei_config.yaml",
+        help="Path to the parameter YAML file.",
+    )
+    parser.add_argument(
+        "--output_dir",
+        type=str,
+        default="Segmentation",
+        help="Directory to save the output.",
+    )
+    parser.add_argument(
+        "--cache_dir", type=str, default="cache", help="Directory for cache files."
+    )
+    parser.add_argument(
+        "--show_gt", action="store_true", help="Show ground truth labels."
+    )
+    parser.add_argument(
+        "--show_prediction", action="store_true", help="Show prediction labels."
+    )
     parser.add_argument("--video_3d", action="store_true", help="Export 3D video.")
-    parser.add_argument("--show_viewer", action="store_true", help="Show Napari viewer.")
+    parser.add_argument(
+        "--show_viewer", action="store_true", help="Show Napari viewer."
+    )
     parser.add_argument("--export_video", action="store_true", help="Export video.")
 
     args = parser.parse_args()

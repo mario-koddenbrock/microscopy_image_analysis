@@ -7,7 +7,11 @@ import rasterio
 import torch
 from PIL import Image
 from rasterio.errors import RasterioIOError
-from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, classification_report
+from sklearn.metrics import (
+    confusion_matrix,
+    ConfusionMatrixDisplay,
+    classification_report,
+)
 from torch import nn, optim
 from torch.utils.data import DataLoader, random_split
 from torchvision import datasets, transforms, models
@@ -18,7 +22,7 @@ ignored_warnings = [
     rasterio.errors.NotGeoreferencedWarning,
     DeprecationWarning,
     FutureWarning,
-    UserWarning
+    UserWarning,
 ]
 
 for warning in ignored_warnings:
@@ -26,8 +30,15 @@ for warning in ignored_warnings:
 
 
 class ImageClassifierTrainer:
-    def __init__(self, data_dir, batch_size=32, num_epochs=10, learning_rate=0.001,
-                 model_name='resnet18', model_path=None):
+    def __init__(
+        self,
+        data_dir,
+        batch_size=32,
+        num_epochs=10,
+        learning_rate=0.001,
+        model_name="resnet18",
+        model_path=None,
+    ):
         """
         Initializes the ImageClassifierTrainer.
 
@@ -67,27 +78,32 @@ class ImageClassifierTrainer:
         input_size = 224
 
         # Adjust input size for specific models
-        if self.model_name == 'inception_v3':
+        if self.model_name == "inception_v3":
             input_size = 299
 
         # Define data transformations with augmentation for training data
-        self.train_transforms = transforms.Compose([
-            transforms.Resize((input_size, input_size)),
-            transforms.RandomHorizontalFlip(),
-            transforms.RandomVerticalFlip(),
-            transforms.RandomRotation(20),
-            transforms.ToTensor(),
-            transforms.Normalize([0.485, 0.456, 0.406],  # Mean for normalization
-                                 [0.229, 0.224, 0.225])  # Std for normalization
-        ])
+        self.train_transforms = transforms.Compose(
+            [
+                transforms.Resize((input_size, input_size)),
+                transforms.RandomHorizontalFlip(),
+                transforms.RandomVerticalFlip(),
+                transforms.RandomRotation(20),
+                transforms.ToTensor(),
+                transforms.Normalize(
+                    [0.485, 0.456, 0.406],  # Mean for normalization
+                    [0.229, 0.224, 0.225],
+                ),  # Std for normalization
+            ]
+        )
 
         # Validation and test data transformations (no augmentation)
-        self.test_transforms = transforms.Compose([
-            transforms.Resize((input_size, input_size)),
-            transforms.ToTensor(),
-            transforms.Normalize([0.485, 0.456, 0.406],
-                                 [0.229, 0.224, 0.225])
-        ])
+        self.test_transforms = transforms.Compose(
+            [
+                transforms.Resize((input_size, input_size)),
+                transforms.ToTensor(),
+                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+            ]
+        )
 
         # Define the custom image loader using Rasterio
         def rasterio_loader(path):
@@ -97,7 +113,7 @@ class ImageClassifierTrainer:
                     # Handle band counts
                     if image_array.shape[0] == 1:
                         # Single band (grayscale), stack to create RGB
-                        image_array = np.concatenate([image_array]*3, axis=0)
+                        image_array = np.concatenate([image_array] * 3, axis=0)
                     elif image_array.shape[0] > 3:
                         # More than 3 bands, take the first 3
                         image_array = image_array[:3]
@@ -105,7 +121,9 @@ class ImageClassifierTrainer:
                     image_array = np.transpose(image_array, (1, 2, 0))
                     # Convert to uint8 if necessary
                     if image_array.dtype != np.uint8:
-                        image_array = (image_array / np.max(image_array) * 255).astype(np.uint8)
+                        image_array = (image_array / np.max(image_array) * 255).astype(
+                            np.uint8
+                        )
                     # Convert to PIL Image
                     image = Image.fromarray(image_array)
                     return image
@@ -121,8 +139,10 @@ class ImageClassifierTrainer:
         test_size = len(full_dataset) - train_size - val_size
 
         self.train_dataset, self.val_dataset, self.test_dataset = random_split(
-            full_dataset, [train_size, val_size, test_size],
-            generator=torch.Generator().manual_seed(42))
+            full_dataset,
+            [train_size, val_size, test_size],
+            generator=torch.Generator().manual_seed(42),
+        )
 
         # Apply transforms
         self.train_dataset.dataset.transform = self.train_transforms
@@ -130,12 +150,15 @@ class ImageClassifierTrainer:
         self.test_dataset.dataset.transform = self.test_transforms
 
         # Data loaders with num_workers=0
-        self.train_loader = DataLoader(self.train_dataset, batch_size=self.batch_size,
-                                       shuffle=True, num_workers=0)
-        self.val_loader = DataLoader(self.val_dataset, batch_size=self.batch_size,
-                                     shuffle=False, num_workers=0)
-        self.test_loader = DataLoader(self.test_dataset, batch_size=self.batch_size,
-                                      shuffle=False, num_workers=0)
+        self.train_loader = DataLoader(
+            self.train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=0
+        )
+        self.val_loader = DataLoader(
+            self.val_dataset, batch_size=self.batch_size, shuffle=False, num_workers=0
+        )
+        self.test_loader = DataLoader(
+            self.test_dataset, batch_size=self.batch_size, shuffle=False, num_workers=0
+        )
 
         self.class_names = full_dataset.classes
 
@@ -154,43 +177,43 @@ class ImageClassifierTrainer:
     def _get_pretrained_model(self, model_name, num_classes):
         """Loads a pretrained model and modifies it for the current task."""
         model_name = model_name.lower()
-        if model_name == 'resnet18':
+        if model_name == "resnet18":
             model = models.resnet18(pretrained=True)
             num_ftrs = model.fc.in_features
             model.fc = nn.Linear(num_ftrs, num_classes)
-        elif model_name == 'resnet34':
+        elif model_name == "resnet34":
             model = models.resnet34(pretrained=True)
             num_ftrs = model.fc.in_features
             model.fc = nn.Linear(num_ftrs, num_classes)
-        elif model_name == 'resnet50':
+        elif model_name == "resnet50":
             model = models.resnet50(pretrained=True)
             num_ftrs = model.fc.in_features
             model.fc = nn.Linear(num_ftrs, num_classes)
-        elif model_name == 'resnet101':
+        elif model_name == "resnet101":
             model = models.resnet101(pretrained=True)
             num_ftrs = model.fc.in_features
             model.fc = nn.Linear(num_ftrs, num_classes)
-        elif model_name == 'resnet152':
+        elif model_name == "resnet152":
             model = models.resnet152(pretrained=True)
             num_ftrs = model.fc.in_features
             model.fc = nn.Linear(num_ftrs, num_classes)
-        elif model_name.startswith('vgg'):
+        elif model_name.startswith("vgg"):
             model = getattr(models, model_name)(pretrained=True)
             num_ftrs = model.classifier[-1].in_features
             model.classifier[-1] = nn.Linear(num_ftrs, num_classes)
-        elif model_name.startswith('densenet'):
+        elif model_name.startswith("densenet"):
             model = getattr(models, model_name)(pretrained=True)
             num_ftrs = model.classifier.in_features
             model.classifier = nn.Linear(num_ftrs, num_classes)
-        elif model_name.startswith('mobilenet'):
+        elif model_name.startswith("mobilenet"):
             model = getattr(models, model_name)(pretrained=True)
             num_ftrs = model.classifier[-1].in_features
             model.classifier[-1] = nn.Linear(num_ftrs, num_classes)
-        elif model_name.startswith('efficientnet'):
+        elif model_name.startswith("efficientnet"):
             model = getattr(models, model_name)(pretrained=True)
             num_ftrs = model.classifier[-1].in_features
             model.classifier[-1] = nn.Linear(num_ftrs, num_classes)
-        elif model_name == 'inception_v3':
+        elif model_name == "inception_v3":
             model = models.inception_v3(pretrained=True)
             # Inception v3 has two classifiers
             num_ftrs = model.fc.in_features
@@ -206,12 +229,12 @@ class ImageClassifierTrainer:
         best_val_loss = np.inf
 
         # Ensure the models directory exists
-        models_dir = os.path.join('../models', 'Classification')
+        models_dir = os.path.join("../models", "Classification")
         os.makedirs(models_dir, exist_ok=True)
-        self.model_path = os.path.join(models_dir, f'best_model_{self.model_name}.pt')
+        self.model_path = os.path.join(models_dir, f"best_model_{self.model_name}.pt")
 
         for epoch in range(self.num_epochs):
-            print(f'Epoch {epoch+1}/{self.num_epochs}')
+            print(f"Epoch {epoch+1}/{self.num_epochs}")
             train_loss = 0.0
             val_loss = 0.0
             correct_train = 0
@@ -221,7 +244,7 @@ class ImageClassifierTrainer:
 
             # Training phase
             self.model.train()
-            train_loader = tqdm(self.train_loader, desc='Training', leave=False)
+            train_loader = tqdm(self.train_loader, desc="Training", leave=False)
             for inputs, labels in train_loader:
                 inputs = inputs.to(self.device)
                 labels = labels.to(self.device)
@@ -230,7 +253,7 @@ class ImageClassifierTrainer:
                 self.optimizer.zero_grad()
 
                 # Forward and backward pass
-                if self.model_name == 'inception_v3':
+                if self.model_name == "inception_v3":
                     # Inception v3 requires special handling
                     outputs, aux_outputs = self.model(inputs)
                     loss1 = self.criterion(outputs, labels)
@@ -251,18 +274,18 @@ class ImageClassifierTrainer:
                 total_train += labels.size(0)
 
                 # Update progress bar
-                train_loader.set_postfix({'Loss': loss.item()})
+                train_loader.set_postfix({"Loss": loss.item()})
 
             # Validation phase
             self.model.eval()
-            val_loader = tqdm(self.val_loader, desc='Validation', leave=False)
+            val_loader = tqdm(self.val_loader, desc="Validation", leave=False)
             with torch.no_grad():
                 for inputs, labels in val_loader:
                     inputs = inputs.to(self.device)
                     labels = labels.to(self.device)
 
                     # Forward pass
-                    if self.model_name == 'inception_v3':
+                    if self.model_name == "inception_v3":
                         outputs, _ = self.model(inputs)
                     else:
                         outputs = self.model(inputs)
@@ -277,7 +300,7 @@ class ImageClassifierTrainer:
                     total_val += labels.size(0)
 
                     # Update progress bar
-                    val_loader.set_postfix({'Loss': loss.item()})
+                    val_loader.set_postfix({"Loss": loss.item()})
 
             # Calculate average losses and accuracies
             train_loss = train_loss / len(self.train_loader.dataset)
@@ -290,8 +313,8 @@ class ImageClassifierTrainer:
             self.train_accuracies.append(train_accuracy.item())
             self.val_accuracies.append(val_accuracy.item())
 
-            print(f'Train Loss: {train_loss:.4f} \t Train Acc: {train_accuracy:.4f}')
-            print(f'Val Loss: {val_loss:.4f} \t Val Acc: {val_accuracy:.4f}')
+            print(f"Train Loss: {train_loss:.4f} \t Train Acc: {train_accuracy:.4f}")
+            print(f"Val Loss: {val_loss:.4f} \t Val Acc: {val_accuracy:.4f}")
 
             # Save the model if validation loss has decreased
             if val_loss < best_val_loss:
@@ -303,7 +326,6 @@ class ImageClassifierTrainer:
         # Optionally, plot the training and validation loss and accuracy curves
         self._plot_training_curves()
 
-
     def evaluate(self):
         # # Load the best model
         # self.load_model(self.model_path)
@@ -312,14 +334,14 @@ class ImageClassifierTrainer:
         self.model.eval()
         all_preds = []
         all_labels = []
-        test_loader = tqdm(self.test_loader, desc='Testing', leave=False)
+        test_loader = tqdm(self.test_loader, desc="Testing", leave=False)
         with torch.no_grad():
             for inputs, labels in test_loader:
                 inputs = inputs.to(self.device)
                 labels = labels.to(self.device)
 
                 # Forward pass
-                if self.model_name == 'inception_v3':
+                if self.model_name == "inception_v3":
                     outputs, _ = self.model(inputs)
                 else:
                     outputs = self.model(inputs)
@@ -331,11 +353,12 @@ class ImageClassifierTrainer:
 
         # Generate confusion matrix
         cm = confusion_matrix(all_labels, all_preds)
-        disp = ConfusionMatrixDisplay(confusion_matrix=cm,
-                                      display_labels=self.class_names)
+        disp = ConfusionMatrixDisplay(
+            confusion_matrix=cm, display_labels=self.class_names
+        )
         fig, ax = plt.subplots(figsize=(12, 12))
-        disp.plot(ax=ax, xticks_rotation='vertical')
-        plt.title('Confusion Matrix')
+        disp.plot(ax=ax, xticks_rotation="vertical")
+        plt.title("Confusion Matrix")
         plt.show()
 
         # Print classification report
@@ -360,41 +383,42 @@ class ImageClassifierTrainer:
 
         # Plot Loss
         plt.figure(figsize=(10, 5))
-        plt.plot(epochs, self.train_losses, label='Training Loss')
-        plt.plot(epochs, self.val_losses, label='Validation Loss')
-        plt.xlabel('Epoch')
-        plt.ylabel('Loss')
-        plt.title('Training and Validation Loss')
+        plt.plot(epochs, self.train_losses, label="Training Loss")
+        plt.plot(epochs, self.val_losses, label="Validation Loss")
+        plt.xlabel("Epoch")
+        plt.ylabel("Loss")
+        plt.title("Training and Validation Loss")
         plt.legend()
         plt.show()
 
         # Plot Accuracy
         plt.figure(figsize=(10, 5))
-        plt.plot(epochs, self.train_accuracies, label='Training Accuracy')
-        plt.plot(epochs, self.val_accuracies, label='Validation Accuracy')
-        plt.xlabel('Epoch')
-        plt.ylabel('Accuracy')
-        plt.title('Training and Validation Accuracy')
+        plt.plot(epochs, self.train_accuracies, label="Training Accuracy")
+        plt.plot(epochs, self.val_accuracies, label="Validation Accuracy")
+        plt.xlabel("Epoch")
+        plt.ylabel("Accuracy")
+        plt.title("Training and Validation Accuracy")
         plt.legend()
         plt.show()
-
 
     def _print_classification_report(self, true_labels, predicted_labels):
         """
         Generates and prints a classification report.
         """
-        report = classification_report(true_labels, predicted_labels, target_names=self.class_names)
+        report = classification_report(
+            true_labels, predicted_labels, target_names=self.class_names
+        )
         print("\nClassification Report:")
         print(report)
 
 
-if __name__ == '__main__':
-    data_dir = os.path.join('../datasets', 'Classification')
-    models_dir = os.path.join('../models', 'Classification')
+if __name__ == "__main__":
+    data_dir = os.path.join("../datasets", "Classification")
+    models_dir = os.path.join("../models", "Classification")
     os.makedirs(models_dir, exist_ok=True)
 
     # Specify the model architecture you want to use
-    model_name = 'resnet50'  # Change this to the desired architecture
+    model_name = "resnet50"  # Change this to the desired architecture
 
     # Initialize the trainer (first time, no model_path)
     trainer = ImageClassifierTrainer(
@@ -402,7 +426,7 @@ if __name__ == '__main__':
         batch_size=32,
         num_epochs=10,
         learning_rate=0.001,
-        model_name=model_name
+        model_name=model_name,
     )
     trainer.train()
     trainer.evaluate()
@@ -411,6 +435,6 @@ if __name__ == '__main__':
     trainer_loaded = ImageClassifierTrainer(
         data_dir=data_dir,
         model_name=model_name,
-        model_path=os.path.join(models_dir, f'best_model_{model_name}.pt')
+        model_path=os.path.join(models_dir, f"best_model_{model_name}.pt"),
     )
     trainer_loaded.evaluate()

@@ -3,35 +3,21 @@ import time
 
 import torch
 
-
 from mia import plotting, prompts
-
-
 
 
 def check_set_gpu(override=None):
     if override is None:
         if torch.cuda.is_available():
-            device = torch.device('cuda')
+            device = torch.device("cuda")
         elif torch.backends.mps.is_available():
-            device = torch.device('mps')
+            device = torch.device("mps")
         else:
-            device = torch.device('cpu')
+            device = torch.device("cpu")
     else:
         device = torch.device(override)
 
     return device
-
-
-def check_paths(image_dir, output_dir, cache_dir):
-
-    if not os.path.exists(image_dir):
-        raise FileNotFoundError(f"Directory not found: {image_dir}")
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-    if not os.path.exists(cache_dir):
-        os.makedirs(cache_dir)
-
 
 
 def initialize_evaluators(device, config):
@@ -54,7 +40,7 @@ def initialize_evaluators(device, config):
     return evaluators
 
 
-def evaluate_image(evaluators, image_path, sample_prompt = "Describe the image:"):
+def evaluate_image(evaluators, image_path, sample_prompt="Describe the image:"):
     """
     Evaluate an image using the provided evaluators.
 
@@ -69,14 +55,24 @@ def evaluate_image(evaluators, image_path, sample_prompt = "Describe the image:"
         start_time = time.time()
         results[name] = evaluator.evaluate(prompt=sample_prompt, image_path=image_path)
         end_time = time.time()
-        print(f"{name} Output: {results[name]} (Evaluated in {end_time - start_time:.2f} seconds)")
+        print(
+            f"{name} Output: {results[name]} (Evaluated in {end_time - start_time:.2f} seconds)"
+        )
 
     image_name = os.path.basename(image_path)
-    return plotting.show_prediction_result(image_path, image_name, sample_prompt, results)
+    return plotting.show_prediction_result(
+        image_path, image_name, sample_prompt, results
+    )
 
 
-
-def evaluate_dataset(evaluators, dataset_name, dataset_description, dataset_path, num_images_per_class, num_classes):
+def evaluate_dataset(
+    evaluators,
+    dataset_name,
+    dataset_description,
+    dataset_path,
+    num_images_per_class,
+    num_classes,
+):
     """
     Evaluate a dataset using the provided evaluators.
 
@@ -93,7 +89,9 @@ def evaluate_dataset(evaluators, dataset_name, dataset_description, dataset_path
         return
 
     print(f"Dataset: {dataset_name}")
-    prompt = prompts.classification_prompt(dataset_name=dataset_name, dataset_description=dataset_description)
+    prompt = prompts.classification_prompt(
+        dataset_name=dataset_name, dataset_description=dataset_description
+    )
 
     result_images = []
     for class_idx, class_name in enumerate(classes[:num_classes]):
@@ -112,14 +110,21 @@ def evaluate_dataset(evaluators, dataset_name, dataset_description, dataset_path
                     evaluator.set_class_names(classes)
 
                 start_time = time.time()
-                results[name] = evaluator.evaluate(prompt=prompt, image_path=sample_image_url)
+                results[name] = evaluator.evaluate(
+                    prompt=prompt, image_path=sample_image_url
+                )
                 end_time = time.time()
-                print(f"\t\t{name} Output: {results[name]} (Evaluated in {end_time - start_time:.2f} seconds)")
+                print(
+                    f"\t\t{name} Output: {results[name]} (Evaluated in {end_time - start_time:.2f} seconds)"
+                )
 
-            result_image_path = plotting.show_prediction_result(sample_image_url, dataset_name, class_name, results)
+            result_image_path = plotting.show_prediction_result(
+                sample_image_url, dataset_name, class_name, results
+            )
             result_images.append(result_image_path)
 
     return result_images
+
 
 def get_class_files(dataset_path, class_name):
 
@@ -146,7 +151,11 @@ def get_class_files(dataset_path, class_name):
         class_path = os.path.join(class_path, "test")
 
     # get full file path to the images inside class_path
-    files = [os.path.join(class_path, f) for f in os.listdir(class_path) if not f.startswith(".")]
+    files = [
+        os.path.join(class_path, f)
+        for f in os.listdir(class_path)
+        if not f.startswith(".")
+    ]
 
     return files
 

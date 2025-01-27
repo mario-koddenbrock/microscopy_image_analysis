@@ -21,7 +21,8 @@ def filter_model_parameter(params):
     ]
     return {k: params.get(k, None) for k in model_keys}
 
-def compute_hash(image, parameters, compute_masks:bool = True):
+
+def compute_hash(image, parameters, compute_masks: bool = True):
     """
     Compute a unique hash for the image and parameters.
     """
@@ -30,7 +31,9 @@ def compute_hash(image, parameters, compute_masks:bool = True):
         parameters = filter_model_parameter(parameters)
 
     image_hash = hashlib.sha256(image.tobytes()).hexdigest()
-    param_hash = hashlib.sha256(json.dumps(asdict(parameters), sort_keys=True).encode()).hexdigest()
+    param_hash = hashlib.sha256(
+        json.dumps(asdict(parameters), sort_keys=True).encode()
+    ).hexdigest()
     return f"{image_hash}_{param_hash}"
 
 
@@ -45,7 +48,9 @@ def save_to_cache(cache_dir, cache_key, masks, flows, styles, diams):
     # Save each component separately
     np.save(os.path.join(cache_key_dir, "masks.npy"), masks.astype(np.uint16))
     np.save(os.path.join(cache_key_dir, "styles.npy"), styles.astype(np.float32))
-    np.save(os.path.join(cache_key_dir, "diams.npy"), np.array([diams], dtype=np.float32))
+    np.save(
+        os.path.join(cache_key_dir, "diams.npy"), np.array([diams], dtype=np.float32)
+    )
 
     # Save flows as separate files
     flows_dir = os.path.join(cache_key_dir, "flows")

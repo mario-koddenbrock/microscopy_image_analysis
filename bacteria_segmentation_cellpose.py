@@ -24,10 +24,10 @@ def main(image_dir, output_dir):
 
     # DEFINE CELLPOSE MODEL
     # model_type='cyto' or model_type='nuclei'
-    model = Cellpose(gpu=False, model_type="bact_omni")
+    model = Cellpose(gpu=False, model_type="cyto3")
     flow_threshold = 0.3
     diameter = None
-    cellprob_threshold = 1 # -6, .. 6
+    cellprob_threshold = 1  # -6, .. 6
     channels = [0, 0]  # grayscale image
 
     image_paths = glob.glob(os.path.join(image_dir, "*.png"))
@@ -52,26 +52,31 @@ def main(image_dir, output_dir):
             channels=channels,
         )
 
-
         # Get region properties of the labels for finding centroid of each instance
         regions = regionprops(masks)
 
-        image_with_labels = render_label(masks, img=image, alpha=0.7, normalize_img=False, alpha_boundary=1)
+        image_with_labels = render_label(
+            masks, img=image, alpha=0.7, normalize_img=False, alpha_boundary=1
+        )
         # image_with_labels = labels
         # im = Image.fromarray(image_with_labels[:, :, :3])
         # im.save(os.path.join(output_dir, os.path.basename(image_path)))
 
         # Alternatively, save using PIL (requires conversion to uint8 format)
-        image_with_labels_path = os.path.join(output_dir, f"{image_name}_segmentation_overlay.png")
+        image_with_labels_path = os.path.join(
+            output_dir, f"{image_name}_segmentation_overlay.png"
+        )
         labels_8bit = (masks / masks.max() * 255).astype(np.uint8)
         Image.fromarray(labels_8bit).save(image_with_labels_path)
 
-        image_with_polys_path = os.path.join(output_dir, f"{image_name}_poly_overlay.png")
+        image_with_polys_path = os.path.join(
+            output_dir, f"{image_name}_poly_overlay.png"
+        )
         plt.figure(figsize=(100, 100))
         img_show = img if img.ndim == 2 else img[..., 0]
         # coord, points, prob = details['coord'], details['points'], details['prob']
-        plt.imshow(img_show, cmap='gray')
-        plt.axis('off')
+        plt.imshow(img_show, cmap="gray")
+        plt.axis("off")
         a = plt.axis()
         # _draw_polygons(coord, points, prob, show_dist=True)
         plt.axis(a)
@@ -79,18 +84,13 @@ def main(image_dir, output_dir):
         plt.savefig(image_with_polys_path)
         plt.close()
 
-        if image_idx > -1:
-            video_path = os.path.join(output_dir, f"{image_name}_segmentation_count_video.mp4")
-            save_as_video(video_path, image_with_labels, masks, regions)
-
-
+        # if image_idx > -1:
+        #     video_path = os.path.join(output_dir, f"{image_name}_segmentation_count_video.mp4")
+        #     save_as_video(video_path, image_with_labels, masks, regions)
 
 
 if __name__ == "__main__":
     image_dir = "Datasets/Run_1/S.aureus"
-    output_dir = "Segmentation/Run_1/S.aureus"
-    main(image_dir, output_dir)
-
-    image_dir = "Datasets/Run_1/E.coli"
-    output_dir = "Segmentation/Run_1/E.coli"
+    image_dir = "Datasets/20250114_Overlay/"
+    output_dir = "results/Segmentation/20250114_Overlay/"
     main(image_dir, output_dir)

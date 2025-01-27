@@ -21,5 +21,6 @@ class TestPhiVisionEvaluator(unittest.TestCase):
         self.assertIsInstance(result, str)
         self.assertGreater(len(result), 0)
 
+
 if __name__ == "__main__":
     unittest.main()

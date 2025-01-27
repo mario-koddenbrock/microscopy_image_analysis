@@ -26,7 +26,9 @@ class CLIPEvaluator:
 
     def _calculate_text_embeddings(self):
         # Calculate text embeddings for the provided class names
-        inputs = self.processor(text=self.class_names, return_tensors="pt", padding=True).to(self.device)
+        inputs = self.processor(
+            text=self.class_names, return_tensors="pt", padding=True
+        ).to(self.device)
         with torch.no_grad():
             text_outputs = self.model.get_text_features(**inputs)
 
@@ -40,10 +42,11 @@ class CLIPEvaluator:
     def evaluate(self, prompt="", image_path=""):
         # Load the image (from URL or local)
         image = self._load_image(image_path)
-        inputs = self.processor(images=image, return_tensors="pt", padding=True).to(self.device)
+        inputs = self.processor(images=image, return_tensors="pt", padding=True).to(
+            self.device
+        )
         with torch.no_grad():
             image_outputs = self.model.get_image_features(**inputs)
-
 
         image_outputs /= image_outputs.norm(dim=-1, keepdim=True)
 
@@ -52,13 +55,18 @@ class CLIPEvaluator:
         probs = logits_per_image.softmax(dim=1)
         return self.class_names[probs.argmax().item()]
 
+
 if __name__ == "__main__":
     # Usage example
     class_names = ["cat", "dog", "car", "tree"]
     evaluator = CLIPEvaluator(device="cpu")  # Use "cuda" for GPU, or "cpu" for CPU
     evaluator.set_class_names(class_names)
-    result = evaluator.evaluate(image_path="https://upload.wikimedia.org/wikipedia/commons/9/99/Brooks_Chase_Ranger_of_Jolly_Dogs_Jack_Russell.jpg")
+    result = evaluator.evaluate(
+        image_path="https://upload.wikimedia.org/wikipedia/commons/9/99/Brooks_Chase_Ranger_of_Jolly_Dogs_Jack_Russell.jpg"
+    )
     print(result)
 
-    result = evaluator.evaluate(image_path="https://upload.wikimedia.org/wikipedia/commons/thumb/a/a4/2019_Toyota_Corolla_Icon_Tech_VVT-i_Hybrid_1.8.jpg/500px-2019_Toyota_Corolla_Icon_Tech_VVT-i_Hybrid_1.8.jpg")
+    result = evaluator.evaluate(
+        image_path="https://upload.wikimedia.org/wikipedia/commons/thumb/a/a4/2019_Toyota_Corolla_Icon_Tech_VVT-i_Hybrid_1.8.jpg/500px-2019_Toyota_Corolla_Icon_Tech_VVT-i_Hybrid_1.8.jpg"
+    )
     print(result)

@@ -5,11 +5,12 @@ import numpy as np
 import rasterio
 import requests
 from PIL import Image
-from rasterio import RasterioIOError
 from cachetools import cached, TTLCache
 from cellpose import io
+from rasterio import RasterioIOError
 
 cache = TTLCache(maxsize=100, ttl=300)
+
 
 def pil_loader(image_path):
     """
@@ -21,7 +22,7 @@ def pil_loader(image_path):
     Returns:
         Image: The loaded and converted image.
     """
-    if image_path.startswith('http://') or image_path.startswith('https://'):
+    if image_path.startswith("http://") or image_path.startswith("https://"):
         image = Image.open(requests.get(image_path, stream=True).raw)
     elif os.path.exists(image_path):
         image = Image.open(image_path)
@@ -43,7 +44,9 @@ def load_image_with_gt(image_path, type):
 
 def get_cellpose_ground_truth(image_path, image_name, type="Nuclei"):
 
-    ground_truth_path = image_path.replace("images_cropped_isotropic", f"labelmaps/{type}")
+    ground_truth_path = image_path.replace(
+        "images_cropped_isotropic", f"labelmaps/{type}"
+    )
     ground_truth_path = ground_truth_path.replace(".tif", f"_{type.lower()}-labels.tif")
 
     if os.path.exists(ground_truth_path):
@@ -52,6 +55,7 @@ def get_cellpose_ground_truth(image_path, image_name, type="Nuclei"):
         print(f"Ground truth not found for {image_name}. Skipping.")
         ground_truth = None
     return ground_truth
+
 
 def opencv_loader(path):
     # Read the image using OpenCV
@@ -70,16 +74,16 @@ def opencv_loader(path):
     return image
 
 
-
-
 def rasterio_loader(path):
     try:
         with rasterio.open(path) as src:
-            image_array = src.read()  # Returns a NumPy array with shape (bands, rows, cols)
+            image_array = (
+                src.read()
+            )  # Returns a NumPy array with shape (bands, rows, cols)
             # If the image has multiple bands, stack them appropriately
             if image_array.shape[0] == 1:
                 # Single band (grayscale), stack to create RGB
-                image_array = np.concatenate([image_array]*3, axis=0)
+                image_array = np.concatenate([image_array] * 3, axis=0)
             elif image_array.shape[0] > 3:
                 # More than 3 bands, take the first 3
                 image_array = image_array[:3]

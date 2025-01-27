@@ -17,13 +17,14 @@ class SigLIPEvaluator:
 
     def set_class_names(self, class_names):
         self.class_names = class_names
-        self.candidate_labels = [f'This is a photo of {label}.' for label in self.class_names]
+        self.candidate_labels = [
+            f"This is a photo of {label}." for label in self.class_names
+        ]
 
     def _load_model(self):
         # Load the CLIP model and processor from the pretrained model
         self.model = AutoModel.from_pretrained(self.model_id).to(self.device)
         self.processor = AutoProcessor.from_pretrained(self.model_id)
-
 
     def _load_image(self, image_path):
         # Load and convert the image from the given path
@@ -33,7 +34,12 @@ class SigLIPEvaluator:
         # Load the image (from URL or local)
         image = self._load_image(image_path)
 
-        inputs = self.processor(text=self.class_names, images=image, padding="max_length", return_tensors="pt")
+        inputs = self.processor(
+            text=self.class_names,
+            images=image,
+            padding="max_length",
+            return_tensors="pt",
+        )
         inputs.to(self.device)
         with torch.no_grad():
             with torch.autocast(self.device):
@@ -45,13 +51,18 @@ class SigLIPEvaluator:
 
         return self.class_names[probs.argmax().item()]
 
+
 if __name__ == "__main__":
     # Usage example
     class_names = ["cat", "dog", "car", "tree"]
     evaluator = SigLIPEvaluator(device="cpu")  # Use "cuda" for GPU, or "cpu" for CPU
     evaluator.set_class_names(class_names)
-    result = evaluator.evaluate(image_path="https://upload.wikimedia.org/wikipedia/commons/9/99/Brooks_Chase_Ranger_of_Jolly_Dogs_Jack_Russell.jpg")
+    result = evaluator.evaluate(
+        image_path="https://upload.wikimedia.org/wikipedia/commons/9/99/Brooks_Chase_Ranger_of_Jolly_Dogs_Jack_Russell.jpg"
+    )
     print(result)
 
-    result = evaluator.evaluate(image_path="https://upload.wikimedia.org/wikipedia/commons/thumb/a/a4/2019_Toyota_Corolla_Icon_Tech_VVT-i_Hybrid_1.8.jpg/500px-2019_Toyota_Corolla_Icon_Tech_VVT-i_Hybrid_1.8.jpg")
+    result = evaluator.evaluate(
+        image_path="https://upload.wikimedia.org/wikipedia/commons/thumb/a/a4/2019_Toyota_Corolla_Icon_Tech_VVT-i_Hybrid_1.8.jpg/500px-2019_Toyota_Corolla_Icon_Tech_VVT-i_Hybrid_1.8.jpg"
+    )
     print(result)

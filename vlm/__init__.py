@@ -1,12 +1,13 @@
 import warnings
 import rasterio
 
+
 # Ignore specific warnings
 ignored_warnings = [
     rasterio.errors.NotGeoreferencedWarning,
     DeprecationWarning,
     FutureWarning,
-    UserWarning
+    UserWarning,
 ]
 
 for warning in ignored_warnings:

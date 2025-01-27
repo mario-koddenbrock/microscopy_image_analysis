@@ -13,7 +13,9 @@ class LlamaEvaluator:
 
     def _load_model(self):
         # Load the model and processor, and move the model to the appropriate device (CPU or GPU)
-        self.model = AutoModelForCausalLM.from_pretrained(self.model_id).to(self.device).eval()
+        self.model = (
+            AutoModelForCausalLM.from_pretrained(self.model_id).to(self.device).eval()
+        )
         self.processor = AutoProcessor.from_pretrained(self.model_id)
 
     def _load_image(self, image_path):
@@ -24,13 +26,15 @@ class LlamaEvaluator:
         image = self._load_image(image_path)
 
         messages = [
-            {"role": "user", "content": [
-                {"type": "image"},
-                {"type": "text", "text": prompt}
-            ]}
+            {
+                "role": "user",
+                "content": [{"type": "image"}, {"type": "text", "text": prompt}],
+            }
         ]
 
-        input_text = self.processor.apply_chat_template(messages, add_generation_prompt=True)
+        input_text = self.processor.apply_chat_template(
+            messages, add_generation_prompt=True
+        )
         inputs = self.processor(image, input_text, return_tensors="pt").to(self.device)
         output = self.model.generate(**inputs, max_new_tokens=100)
 
@@ -42,8 +46,12 @@ class LlamaEvaluator:
 if __name__ == "__main__":
     # Usage:
     evaluator = LlamaEvaluator()
-    result = evaluator.evaluate(image_path="https://upload.wikimedia.org/wikipedia/commons/9/99/Brooks_Chase_Ranger_of_Jolly_Dogs_Jack_Russell.jpg")
+    result = evaluator.evaluate(
+        image_path="https://upload.wikimedia.org/wikipedia/commons/9/99/Brooks_Chase_Ranger_of_Jolly_Dogs_Jack_Russell.jpg"
+    )
     print(result)
 
-    result = evaluator.evaluate(image_path="https://upload.wikimedia.org/wikipedia/commons/thumb/a/a4/2019_Toyota_Corolla_Icon_Tech_VVT-i_Hybrid_1.8.jpg/500px-2019_Toyota_Corolla_Icon_Tech_VVT-i_Hybrid_1.8.jpg")
+    result = evaluator.evaluate(
+        image_path="https://upload.wikimedia.org/wikipedia/commons/thumb/a/a4/2019_Toyota_Corolla_Icon_Tech_VVT-i_Hybrid_1.8.jpg/500px-2019_Toyota_Corolla_Icon_Tech_VVT-i_Hybrid_1.8.jpg"
+    )
     print(result)

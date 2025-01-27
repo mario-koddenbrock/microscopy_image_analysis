@@ -15,12 +15,11 @@ if __name__ == "__main__":
     image_pathes = [
         "https://www.uni-assist.de/fileadmin/_processed_/d/5/csm_htw-berlin_Friederike_Coenen_36e250c32e.jpg",
         "https://www.htw-berlin.de/files/Presse/_tmp_/2/2/csm_HTW-Berlin-HTW-Imagefotos-DSC216129-HTW_Berlin-Alexander_Rentsch_f044c85c99.jpg",
-        ]
+    ]
 
     # Determine the device to use (GPU if available, otherwise CPU)
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Device: {device}")
-
 
     # Configuration for evaluators
     EVALUATORS_CONFIG = {

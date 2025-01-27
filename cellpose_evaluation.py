@@ -1,7 +1,7 @@
 import os
 
 from mia.results import print_best_config_per_image
-from mia.viz import plot_aggregated_metric_variation, plot_best_scores_barplot
+from mia.viz import plot_eval
 
 main_folder = "Datasets/P013T/"
 
@@ -12,7 +12,6 @@ if not os.path.exists(result_path):
     print("No results to display.")
     exit()
 
-print_best_config_per_image(result_path, metric='f1', output_file=result_path.replace('results.csv', 'best_configs.json'))
-plot_aggregated_metric_variation(result_path, metric='f1', boxplot=True)
-plot_aggregated_metric_variation(result_path, metric='f1', boxplot=False)
-plot_best_scores_barplot(result_path, metric='f1', output_file=result_path.replace('results.csv', 'best_scores_barplot.png'))
+
+print_best_config_per_image(result_path)
+plot_eval(result_path)

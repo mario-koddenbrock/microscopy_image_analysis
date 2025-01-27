@@ -1,23 +1,21 @@
 import itertools
 import os
 import time
-from medpy.metric.binary import jc
-
 from dataclasses import dataclass
 from enum import Enum
 
-import wandb
-import yaml
 import numpy as np
-from cellpose import transforms
+import yaml
 from cellpose.metrics import aggregated_jaccard_index
 from cellpose.models import CellposeModel
 from skimage.metrics import adapted_rand_error
-from sklearn.metrics import jaccard_score
 
+from cellpose import transforms
 from mia.file_io import load_image_with_gt
 from mia.hash import save_to_cache, compute_hash, load_from_cache
+from mia.metrics import jaccard
 from mia.utils import check_set_gpu
+
 
 # The dataset-specific models were trained on the training images from the following datasets:
 # tissuenet_cp3: tissuenet dataset.
@@ -36,27 +34,41 @@ from mia.utils import check_set_gpu
 # backbone_list # TODO
 # anisotropic_list # TODO
 
-model_list = ["cyto", "cyto2", "cyto3", "nuclei", "tissuenet_cp3", "livecell_cp3", "yeast_PhC_cp3", "yeast_BF_cp3", "bact_phase_cp3", "bact_fluor_cp3", "deepbacs_cp3", "cyto2_cp3"]
 
-param_options = {
-    "model_name": model_list,
-    "channel_segment": [0], # [0, 1, 2, 3]
-    "channel_nuclei": [0],
-    "channel_axis": [None], # TODO
-    "invert": [False, True], # [False, True]
-    "normalize": [False, True], # [False, True]
-    "diameter": [10, 17, 30, 50, 70, 100], # TODO good values (btw. None not working for 3D)
-    "do_3D": [True], # TODO try False too
-    "flow_threshold": [0.1, 0.3, 0.5, 0.7], # [0.3, 0.4, 0.5, 0.6]
-    "cellprob_threshold": [0.0, 0.1, 0.2, 0.5], # [0.0, 0.1, 0.2, 0.3, 0.4, 0.5]
-    "interp": [False], # NOT AVAILABLE FOR 3D
-    "min_size": [15], # TODO
-    "max_size_fraction": [0.5], # TODO
-    "niter": [100], # TODO
-    "stitch_threshold": [0.0], # TODO
-    "tile_overlap": [0.1], # TODO
-    "type": [""],  # just a placeholder for "Nuclei" or "Membranes"
-}
+def ensure_default_parameter(params):
+    default_params = {
+        "model_name": ["cyto3"],
+        "channel_segment": [0],
+        "channel_nuclei": [0],
+        "channel_axis": [None],
+        "invert": [False],
+        "normalize": [True],
+        "normalization_min": [1],
+        "normalization_max": [99],
+        "diameter": [30],
+        "do_3D": [True],
+        "flow_threshold": [0.1],
+        "cellprob_threshold": [0.0],
+        "interp": [False],
+        "min_size": [15],
+        "max_size_fraction": [0.5],
+        "niter": [100],
+        "stitch_threshold": [0.0],
+        "tile_overlap": [0.1],
+        "type": ["Nuclei"],
+    }
+
+    diameter_not_set = "diameter" not in params
+    for key in default_params.keys():
+        if key not in params:
+            params[key] = default_params[key]
+
+    if diameter_not_set:
+        diam_mean = 17.0 if "nuclei" in params["type"][0].lower() else 30.0
+        params["diameter"] = [diam_mean]
+
+    return params
+
 
 # Define a dataclass to store the evaluation parameters
 @dataclass
@@ -67,6 +79,8 @@ class EvaluationParams:
     channel_axis: any
     invert: bool
     normalize: bool
+    normalization_min: int
+    normalization_max: int
     diameter: int
     do_3D: bool
     flow_threshold: float
@@ -94,6 +108,8 @@ class EvaluationParams:
             "channel_axis": self.channel_axis,
             "invert": self.invert,
             "normalize": self.normalize,
+            "normalization_min": self.normalization_min,
+            "normalization_max": self.normalization_max,
             "diameter": self.diameter,
             "do_3D": self.do_3D,
             "flow_threshold": self.flow_threshold,
@@ -104,22 +120,14 @@ class EvaluationParams:
             "niter": self.niter,
             "stitch_threshold": self.stitch_threshold,
             "tile_overlap": self.tile_overlap,
-            "type": self.type
+            "type": self.type,
         }
         try:
-            with open(yaml_file, 'w') as file:
+            with open(yaml_file, "w") as file:
                 yaml.dump(config, file, default_flow_style=False)
             print(f"Saved EvaluationParams to {yaml_file}")
         except Exception as e:
             print(f"Error saving EvaluationParams to YAML: {e}")
-
-# Generate all parameter combinations
-evaluation_params = [
-    EvaluationParams(**dict(zip(param_options.keys(), values)))
-    for values in itertools.product(*param_options.values())
-]
-
-
 
 
 def evaluate_model(image_path, params, cache_dir="cache", compute_masks=True):
@@ -144,9 +152,9 @@ def evaluate_model(image_path, params, cache_dir="cache", compute_masks=True):
     # Get the right channel
     image = image_orig[:, channel_idx, :, :] if image_orig.ndim == 4 else image_orig
 
-
-    # # TODO: contrast normalization on image
-    # image = rescale_intensity(image)
+    # get intensity percentile for normalization
+    q1, q3 = np.percentile(image, [params.normalization_min, params.normalization_max])
+    image = np.clip(image, q1, q3)
 
     # plot the intensity distribution of the image
     # plot_intensity(image)
@@ -163,24 +171,16 @@ def evaluate_model(image_path, params, cache_dir="cache", compute_masks=True):
         print(f"\tEVALUATING: {model_name}")
         try:
 
-            # # Load the Cellpose model
-            # model = Cellpose(
-            #     model_type = params.model_name,
-            #     device = device,
-            #     nchan = 2,  # TODO check if this is correct = 1?
-            #     # diam_mean = 30,
-            #     gpu = False,
-            # )
+            # return EvaluationError.EVALUATION_ERROR
 
-
-            # diam_mean = 30.  # default for any cyto model
-            # nuclear = "nuclei" in params.model_name
-            # if nuclear:
-            #     diam_mean = 17.
-
-            model = CellposeModel(device=device, gpu=False, model_type=params.model_name,
-                                    diam_mean=params.diameter, nchan=2,
-                                    backbone="default")
+            model = CellposeModel(
+                device=device,
+                gpu=False,
+                model_type=params.model_name,
+                diam_mean=params.diameter,
+                nchan=2,
+                backbone="default",
+            )
 
             masks, flows, styles = model.eval(
                 image,
@@ -192,8 +192,8 @@ def evaluate_model(image_path, params, cache_dir="cache", compute_masks=True):
                 do_3D=params.do_3D,
                 flow_threshold=params.flow_threshold,
                 invert=params.invert,
-                max_size_fraction=0.5, # default
-                min_size=15, # default
+                max_size_fraction=0.5,  # default
+                min_size=15,  # default
                 normalize=params.normalize,
                 z_axis=0,  # TODO: z-axis parameter always 0?
             )
@@ -214,10 +214,13 @@ def evaluate_model(image_path, params, cache_dir="cache", compute_masks=True):
             channel_axis=params.channel_axis,
             z_axis=0,
             do_3D=(params.do_3D or params.stitch_threshold > 0),
-            nchan=nchan)
+            nchan=nchan,
+        )
 
         masks = model.cp._compute_masks(
-            x.shape, dP, cellprob,
+            x.shape,
+            dP,
+            cellprob,
             flow_threshold=params.flow_threshold,
             cellprob_threshold=params.cellprob_threshold,
             interp=params.interp,
@@ -243,17 +246,24 @@ def evaluate_model(image_path, params, cache_dir="cache", compute_masks=True):
 
         # jaccard = jc(masks, ground_truth)
 
-        jaccard_sklearn = jaccard_score(ground_truth.flatten(), masks.flatten(), average='micro')
-        aji_scores = aggregated_jaccard_index(ground_truth, masks)
-        jaccard_cellpose = np.mean(aji_scores)
+        jaccard_score = jaccard(ground_truth, masks)
+
+        aji_scores = aggregated_jaccard_index([ground_truth], [masks])
+
+        # compute mean of non-nan values
+        jaccard_cellpose = np.mean(aji_scores[~np.isnan(aji_scores)])
 
         are, precision, recall = adapted_rand_error(ground_truth, masks)
-        f1 = 2 * (precision * recall) / (precision + recall) if precision + recall > 0 else 0
+        f1 = (
+            2 * (precision * recall) / (precision + recall)
+            if precision + recall > 0
+            else 0
+        )
         print(f"\tAdapted Rand Error: {are:.2f}")
         print(f"\tPrecision: {precision:.2f}")
         print(f"\tRecall: {recall:.2f}")
         print(f"\tF1: {f1:.2f}")
-        print(f"\tJaccard (sklearn): {jaccard_sklearn:.2f}")
+        print(f"\tJaccard (own): {jaccard_score:.2f}")
         print(f"\tJaccard (cellpose): {jaccard_cellpose:.2f}")
 
     # fig = plt.figure(figsize=(12, 5))
@@ -270,14 +280,10 @@ def evaluate_model(image_path, params, cache_dir="cache", compute_masks=True):
         "precision": precision,
         "recall": recall,
         "f1": f1,
-        "jaccard_sklearn": jaccard_sklearn,
+        "jaccard": jaccard_score,
         "jaccard_cellpose": jaccard_cellpose,
         "duration": duration,
     }
-
-
-
-
 
     return results
 
@@ -294,7 +300,7 @@ def read_yaml(yaml_file: str = "") -> EvaluationParams:
     """
     # Load configuration from YAML
     try:
-        with open(yaml_file, 'r') as file:
+        with open(yaml_file, "r") as file:
             config = yaml.safe_load(file)
     except FileNotFoundError:
         print(f"Error: File '{yaml_file}' not found.")
@@ -309,23 +315,25 @@ def read_yaml(yaml_file: str = "") -> EvaluationParams:
 
     # Map configuration to EvaluationParams
     params = EvaluationParams(
-        model_name=config.get('model_name'),
-        channel_segment=config.get('channel_segment'),
-        channel_nuclei=config.get('channel_nuclei'),
-        channel_axis=config.get('channel_axis'),
-        invert=config.get('invert'),
-        normalize=config.get('normalize'),
-        diameter=config.get('diameter'),
-        do_3D=config.get('do_3D'),
-        flow_threshold=config.get('flow_threshold'),
-        cellprob_threshold=config.get('cellprob_threshold'),
-        interp=config.get('interp'),
-        min_size=config.get('min_size'),
-        max_size_fraction=config.get('max_size_fraction'),
-        niter=config.get('niter'),
-        stitch_threshold=config.get('stitch_threshold'),
-        tile_overlap=config.get('tile_overlap'),
-        type=config.get('type')
+        model_name=config.get("model_name"),
+        channel_segment=config.get("channel_segment"),
+        channel_nuclei=config.get("channel_nuclei"),
+        channel_axis=config.get("channel_axis"),
+        invert=config.get("invert"),
+        normalize=config.get("normalize"),
+        normalization_min=config.get("normalization_min"),
+        normalization_max=config.get("normalization_max"),
+        diameter=config.get("diameter"),
+        do_3D=config.get("do_3D"),
+        flow_threshold=config.get("flow_threshold"),
+        cellprob_threshold=config.get("cellprob_threshold"),
+        interp=config.get("interp"),
+        min_size=config.get("min_size"),
+        max_size_fraction=config.get("max_size_fraction"),
+        niter=config.get("niter"),
+        stitch_threshold=config.get("stitch_threshold"),
+        tile_overlap=config.get("tile_overlap"),
+        type=config.get("type"),
     )
 
     return params
